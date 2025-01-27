@@ -9,6 +9,30 @@ using DelimitedFiles, JSON
 
 ## Constants struct
 
+# struct Constants
+# 	N::Int64  					# number of modes for solution S(z)
+# 	L::Number                   # half-domain length
+	
+# 	# domain definition
+# 	dz::Float64 				# domain spacing
+#     z::Vector{Float64} 			# domain vector of values (2N + 2 points)
+
+# 	# magnetic constants 
+# 	B::Float64 					# Bond number 
+# 	b::Float64 					# inner rod radius
+#     E::Float64                  # Bernoulli constant 
+	
+	
+# 	function Constants(N::Int64, L::Number, B::Float64, b::Float64)
+#         dz = 2*L / (2*N+1)
+#         z = collect(-L:dz:L)
+		
+#         E = 1 - B/2
+
+#         new(N, L, dz, z, B, b, E)
+#     end
+# end
+
 struct Constants
 	N::Int64  					# number of modes for solution S(z)
 	L::Number                   # half-domain length
@@ -17,19 +41,19 @@ struct Constants
 	dz::Float64 				# domain spacing
     z::Vector{Float64} 			# domain vector of values (2N + 2 points)
 
-	# magnetic constants 
-	B::Float64 					# Bond number 
+	# physical geometry constants 
 	b::Float64 					# inner rod radius
-    E::Float64                  # Bernoulli constant 
+	λ1::Float64					# principal stretches
+	λ2::Float64
+
+	vf::Float64					# fluid velocity 
 	
 	
-	function Constants(N::Int64, L::Number, B::Float64, b::Float64)
+	function Constants(N::Int64, L::Number, b::Float64, λ1::Float64, λ2::Float64, vf::Float64)
         dz = 2*L / (2*N+1)
         z = collect(-L:dz:L)
-		
-        E = 1 - B/2
 
-        new(N, L, dz, z, B, b, E)
+        new(N, L, dz, z, b, λ1, λ2, vf)
     end
 end
 
@@ -204,10 +228,11 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	# problem constants 
 	z = constants.z::Vector{Float64}
 	N = constants.N::Int64
-	B = constants.B::Float64
 	b = constants.b::Float64
-	E = constants.E::Float64
 	L = constants.L::Number
+	λ1 = constants.λ1::Float64
+	λ2 = constants.λ2::Float64
+	vf = constants.vf::Float64
 
 	c = unknowns[1]
 	coeffs = unknowns[2:N+2] # N + 1 coeffs
@@ -224,13 +249,13 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);
 
-	one_p = (Szsq).*((c.^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
-
 	Threads.@threads for n = 1:N
 
 		k = n*π/L 
+
+		w = 1/2 .* (1 - λ1^4 / λ2^4) .* (λ2 * c - vf)^2
 		
-	    one = k .* S .* sqrt.(Complex.(one_p))
+	    one = k .* S .* sqrt.(Complex.(Szsq .* (c^2 - 2*w) )) 
 	    two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
 		
 	    integrands[n, :] = real.(one .* two)
@@ -331,9 +356,10 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 	meta = Dict( # Create a dictionary with the data
 		"N" => constants.N,
 		"L" => constants.L,
-		"B" => constants.B,
 		"b" => constants.b,
-		"E" => constants.E,
+		"λ1" => constants.λ1,
+		"λ2" => constants.λ2,
+		"vf" => constants.vf,
 		"tol" => tol,
 		"branchN" => branchN,
 		"solver" => solver,
@@ -358,19 +384,47 @@ end
 
 ## Helper functions
 
+# function c0(k, constants::Constants)
+# 	## linearized wave speed for small amplitude waves c(k)
+
+# 	B = constants.B
+# 	b = constants.b
+	
+# 	c0 = sqrt.((1 ./ k).*((-β(1,k,b,1) ./ β(0,k,b,1)) .* (k.^2 .- 1 .+ B)))
+
+# 	return c0
+	
+# end
+
 function c0(k, constants::Constants)
 	## linearized wave speed for small amplitude waves c(k)
 
-	B = constants.B
 	b = constants.b
-	
-	c0 = sqrt.((1 ./ k).*((-β(1,k,b,1) ./ β(0,k,b,1)) .* (k.^2 .- 1 .+ B)))
+	λ1 = constants.λ1
+	λ2 = constants.λ2
+	vf = constants.vf
 
-	return c0
+	β_minus = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
+	β_plus = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b)
+
+	C = 1/2 * (1 - λ1^4 / λ2^4)
+	a = (1 ./ k).*(β_minus ./ β_plus) * C 
+
+	# quadratic coeffs (Ac^2 + Bc + D) 
+	A = (1 - a * λ2^2)
+	B = 2 * a * λ2 * vf
+	D = -a * vf^2
+
+	# solve quadratic equation 
+	c0 = (-B + sqrt(Complex(B^2 - 4 * A * D))) / (2 * A)
+
+	return real(c0)
 	
 end
 
 function β(n, k, b, S0)
+
+	# i think this is wrong 
 
 	beta1 = besseli.(1, complex.(k*b)) .* besselk.(n, complex.(k.*S0))
 	beta2 = (-1)^n .* besselk.(1, complex.(k*b)) .* besseli.(n, complex.(k.*S0))
