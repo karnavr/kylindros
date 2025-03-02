@@ -9,30 +9,6 @@ using DelimitedFiles, JSON
 
 ## Constants struct
 
-# struct Constants
-# 	N::Int64  					# number of modes for solution S(z)
-# 	L::Number                   # half-domain length
-	
-# 	# domain definition
-# 	dz::Float64 				# domain spacing
-#     z::Vector{Float64} 			# domain vector of values (2N + 2 points)
-
-# 	# magnetic constants 
-# 	B::Float64 					# Bond number 
-# 	b::Float64 					# inner rod radius
-#     E::Float64                  # Bernoulli constant 
-	
-	
-# 	function Constants(N::Int64, L::Number, B::Float64, b::Float64)
-#         dz = 2*L / (2*N+1)
-#         z = collect(-L:dz:L)
-		
-#         E = 1 - B/2
-
-#         new(N, L, dz, z, B, b, E)
-#     end
-# end
-
 struct Constants
 	N::Int64  					# number of modes for solution S(z)
 	L::Number                   # half-domain length
@@ -43,17 +19,16 @@ struct Constants
 
 	# physical geometry constants 
 	b::Float64 					# inner rod radius
-	λ1::Float64					# principal stretches
-	λ2::Float64
+	λ2::Float64					# principal stretches
 
 	vf::Float64					# fluid velocity 
 	
 	
-	function Constants(N::Int64, L::Number, b::Float64, λ1::Float64, λ2::Float64, vf::Float64)
+	function Constants(N::Int64, L::Number, b::Float64, λ2::Float64, vf::Float64)
         dz = 2*L / (2*N+1)
         z = collect(-L:dz:L)
 
-        new(N, L, dz, z, b, λ1, λ2, vf)
+        new(N, L, dz, z, b, λ2, vf)
     end
 end
 
@@ -230,7 +205,6 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	N = constants.N::Int64
 	b = constants.b::Float64
 	L = constants.L::Number
-	λ1 = constants.λ1::Float64
 	λ2 = constants.λ2::Float64
 	vf = constants.vf::Float64
 
@@ -240,7 +214,7 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
-	S, Sz, Szz = fourierSeries(coeffs, z, L)
+	S, Sz, _ = fourierSeries(coeffs, z, L)
 
 	integrands = zeros(N, length(z)) # N integrands for k = 1:N
 	integrals = zeros(N) 			 # N integrals (array gets condensed on the z-axis)
@@ -249,15 +223,16 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);
 
+	w = (λ2^2)/2 .* (1 .- (1 ./ (S.^4))) .* (c - vf/λ2)^2
+	one_p = Szsq .* (c^2 .- 2 .* w)
+
 	Threads.@threads for n = 1:N
 
 		k = n*π/L 
-
-		w = 1/2 .* (1 - λ1^4 / λ2^4) .* (λ2 * c - vf)^2
 		
-	    one = k .* S .* sqrt.(Complex.(Szsq .* (c^2 - 2*w) )) 
+	    one = k .* S .* sqrt.(Complex.(one_p))
 	    two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
-		
+
 	    integrands[n, :] = real.(one .* two)
 		
 	    # Normalize the integrand before integration to prevent numerical issues
@@ -357,7 +332,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 		"N" => constants.N,
 		"L" => constants.L,
 		"b" => constants.b,
-		"λ1" => constants.λ1,
+		# "λ1" => constants.λ1,
 		"λ2" => constants.λ2,
 		"vf" => constants.vf,
 		"tol" => tol,
@@ -380,43 +355,23 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 end
 
-
-
-## Helper functions
-
-# function c0(k, constants::Constants)
-# 	## linearized wave speed for small amplitude waves c(k)
-
-# 	B = constants.B
-# 	b = constants.b
-	
-# 	c0 = sqrt.((1 ./ k).*((-β(1,k,b,1) ./ β(0,k,b,1)) .* (k.^2 .- 1 .+ B)))
-
-# 	return c0
-	
-# end
-
 function c0(k, constants::Constants)
 	## linearized wave speed for small amplitude waves c(k)
 
 	b = constants.b
-	λ1 = constants.λ1
 	λ2 = constants.λ2
 	vf = constants.vf
 
-	β_minus = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
-	β_plus = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b)
-
-	C = 1/2 * (1 - λ1^4 / λ2^4)
-	a = (1 ./ k).*(β_minus ./ β_plus) * C 
+	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
+	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
 
 	# quadratic coeffs (Ac^2 + Bc + D) 
-	A = (1 - a * λ2^2)
-	B = 2 * a * λ2 * vf
-	D = -a * vf^2
+	A = k*β1 - 2*λ2^2 * β0 + β0
+	B = 4 * vf * λ2 * β0
+	D = -2 * vf^2 * β0
 
 	# solve quadratic equation 
-	c0 = (-B + sqrt(Complex(B^2 - 4 * A * D))) / (2 * A)
+	c0 = solve_quadratic(A, B, D)
 
 	return real(c0)
 	
@@ -514,7 +469,7 @@ function plotting(solution_file::String)
 	meta = JSON.parsefile("results/$(solution_file)/meta_$(solution_file).json")
 
 	# create constants
-	constants = Constants(meta["N"], meta["L"], meta["B"], meta["b"])
+	constants = Constants(meta["N"], meta["L"], meta["b"], meta["λ2"], meta["vf"])
 
 	profile_plot, branch_plot, coeff_plot = plotting(solutions, meta["branchN"], constants)
 	convergence_plot = plot((meta["a1Vals"])[1:end-1], meta["iterations"], xlabel=L"a_1", ylabel="Iterations", legend=false, seriestype = :line, marker = :dot, markersize = 2)
@@ -563,4 +518,14 @@ function recompute_solutions(file_path::String)
 
 	end
 
+end
+
+function solve_quadratic(a, b, c)
+    Δ = b^2 - 4*a*c
+    if Δ < 0
+		print("Solution (c0?) is complex!")
+        return Complex.((-b + sqrt(Δ)) / (2*a))  # Return complex roots
+    else
+        return (-b + sqrt(Δ)) / (2*a)  # Return real roots
+    end
 end
