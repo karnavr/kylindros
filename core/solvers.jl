@@ -1,4 +1,4 @@
-using LinearAlgebra
+"Custom implementation of numerical solvers for systems of equations"
 
 ## WRAPPER FUNCTION
 
