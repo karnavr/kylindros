@@ -223,6 +223,7 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);
 
+	# define wall model
 	w = (λ2^2)/2 .* (1 .- (1 ./ (S.^4))) .* (c - vf/λ2)^2
 	one_p = Szsq .* (c^2 .- 2 .* w)
 
