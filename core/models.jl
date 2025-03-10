@@ -99,6 +99,20 @@ function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
 	return w
 end
 
+function unpackConstants(constants::fuConstants)
+
+	# unpacks values and returns as string 
+	N = constants.N
+	L = constants.L
+	b = constants.b
+	λ1 = constants.λ1
+	λ2 = constants.λ2
+	vf = constants.vf
+	
+	# create a string of all the values 
+	return string(N, L, b, λ1, λ2, vf)
+
+end
 
 ## FU & IL'ICHEV (λ1 = 1)
 
@@ -155,4 +169,18 @@ function wall_model(constants::fuSimpleConstants, c::Float64, S::Vector{Float64}
 	w = (λ2^2)/2 .* (1 .- (1 ./ (S.^4))) .* (c - vf/λ2)^2
 
 	return w
+end
+
+function unpackConstants(constants::fuSimpleConstants)
+
+	# unpacks values and returns as string 
+	N = constants.N
+	L = constants.L
+	b = constants.b
+	λ2 = constants.λ2
+	vf = constants.vf
+	
+	# create a string of all the values 
+	return string(N, L, b, λ2, vf)
+
 end

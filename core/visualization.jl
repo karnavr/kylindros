@@ -53,7 +53,7 @@ function plotting(solution_file::String)
 	meta = JSON.parsefile("results/$(solution_file)/meta_$(solution_file).json")
 
 	# create constants
-	constants = Constants(meta["N"], meta["L"], meta["b"], meta["λ2"], meta["vf"])
+	constants = fuSimpleConstants(meta["N"], meta["L"], meta["b"], meta["λ2"], meta["vf"])
 
 	profile_plot, branch_plot, coeff_plot = plotting(solutions, meta["branchN"], constants)
 	convergence_plot = plot((meta["a1Vals"])[1:end-1], meta["iterations"], xlabel=L"a_1", ylabel="Iterations", legend=false, seriestype = :line, marker = :dot, markersize = 2)
