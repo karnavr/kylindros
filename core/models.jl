@@ -6,7 +6,7 @@ abstract type Constants end
 
 struct ferrofluidConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Number                   # half-domain length
+	L::Real                   # half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
@@ -18,9 +18,9 @@ struct ferrofluidConstants <: Constants
 	E::Float64                  # Bernoulli constant 
 	
 	
-	function ferrofluidConstants(N::Int64, L::Number, B::Float64, b::Float64)
+	function ferrofluidConstants(N::Int64, L::Real, B::Float64, b::Float64)
 		dz = 2*L / (2*N+1)
-		z = collect(-L:dz:L)
+		z = collect(-Float64(L):dz:Float64(L))
 		
 		E = 1 - B/2
 
@@ -44,7 +44,7 @@ end
 
 struct fuConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Number                   # half-domain length
+	L::Real                   # half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
@@ -58,9 +58,9 @@ struct fuConstants <: Constants
 	vf::Float64					# fluid velocity 
 	
 	
-	function fuConstants(N::Int64, L::Number, b::Float64, λ1::Float64, λ2::Float64, vf::Float64)
+	function fuConstants(N::Int64, L::Real, b::Float64, λ1::Float64, λ2::Float64, vf::Float64)
         dz = 2*L / (2*N+1)
-        z = collect(-L:dz:L)
+        z = collect(-Float64(L):dz:Float64(L))
 
         new(N, L, dz, z, b, λ1, λ2, vf)
     end
@@ -118,7 +118,7 @@ end
 
 struct fuSimpleConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Number                   # half-domain length
+	L::Real                   # half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
@@ -131,9 +131,9 @@ struct fuSimpleConstants <: Constants
 	vf::Float64					# fluid velocity 
 	
 	
-	function fuSimpleConstants(N::Int64, L::Number, b::Float64, λ2::Float64, vf::Float64)
+	function fuSimpleConstants(N::Int64, L::Real, b::Float64, λ2::Float64, vf::Float64)
         dz = 2*L / (2*N+1)
-        z = collect(-L:dz:L)
+        z = collect(-Float64(L):dz:Float64(L))
 
         new(N, L, dz, z, b, λ2, vf)
     end
