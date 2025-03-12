@@ -34,10 +34,10 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 	for i = 1:branchN
 
 		# define the set of equations/function to solve: f(x) = 0
-		f(u::Vector{Float64}) = equations(u, constants, a1Vals[i], 1.0) 
+		f(u::Vector{Float64}) = equations(u::Vector{Float64}, constants::Constants, a1Vals[i], 1.0) 
 
 		# solve for the current branch point + capture
-		solutions[i,:], iterations[i], flags[i] = mySolver(f, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
+		solutions[i,:], iterations[i], flags[i] = mySolver(f::Function, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
 
 		# update intial guess 
 		initial_guess[i+1,:] = solutions[i,:]
@@ -85,41 +85,6 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	@save "results/$(filename).jld2" results_dict
 
-	### OLD SAVING METHOD
-	# # if directory exists, delete it
-	# if isdir("results/$(base_name)")
-	# 	rm("results/$(base_name)"; recursive = true)
-	# end
-
-	# # create directory to save results
-	# mkdir("results/$(base_name)")
-
-	# # save solutions, iterations and a1_vals to seperate files 
-	# writedlm("results/$(base_name)/solutions_$base_name.dat", solutions)
-
-	# # create a dictionary to save the solution metadata (constants + solver/solution parameters)
-	# meta = Dict( # Create a dictionary with the data
-	# 	"N" => constants.N,
-	# 	"L" => constants.L,
-	# 	"b" => constants.b,
-	# 	# "λ1" => constants.λ1,
-	# 	"λ2" => constants.λ2,
-	# 	"vf" => constants.vf,
-	# 	"tol" => tol,
-	# 	"branchN" => branchN,
-	# 	"solver" => solver,
-	# 	"max_iter" => max_iter,
-	# 	"initial_guess" => initial_guess[1,:],
-	# 	"a1Vals" => a1Vals,
-	# 	"iterations" => iterations,
-	# 	"errors" => errors, 
-	# 	"flags" => flags
-	# )
-
-	# # Write the dictionary to a JSON file
-	# open("results/$(base_name)/meta_$base_name.json", "w") do f
-	# 	JSON.print(f, meta)
-	# end
 
 	return solutions, iterations
 
