@@ -8,32 +8,29 @@ function β(n, k, b, S0)
 	return real.(beta1 .+ beta2)
 end
 
-function fourierSeries(coefficients::Vector{Float64}, domain, L::Number)
+function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L::Real)
 	
     N = length(coefficients) - 1
+	n_domain = Int(length(domain))
 	
-    S = zeros(length(domain))  		# profile S
-    Sz = zeros(length(domain))  	# first derivative Sz	
-    Szz = zeros(length(domain))  	# second derivative Szz
+    S = zeros(n_domain)  	# profile S
+    Sz = zeros(n_domain)  	# first derivative Sz	
+    Szz = zeros(n_domain)  	# second derivative Szz
 
-    Threads.@threads for i in 1:Int(length(domain))
+	k_values = [(n*π/L) for n in 1:N]
+	
+	# Add constant offset to S
+	S .= coefficients[1] 
+	
+	for n in 1:N
+		k = k_values[n]
+		coeff = coefficients[n + 1]
 
-		x = domain[i]
+		@. S += coeff * cos(k * domain)
+		@. Sz -= k * coeff * sin(k * domain)
+		@. Szz -= k^2 * coeff * cos(k * domain)
+	end
 		
-        # Calculate the series and its derivatives at each point x
-        S[i] = coefficients[1] 
-		
-        for n in 1:N
-
-			k = n*π/L
-
-            S[i] += coefficients[n + 1] * cos(k * x)
-            Sz[i] -= k * coefficients[n + 1] * sin(k * x)
-            Szz[i] -= k^2 * coefficients[n + 1] * cos(k * x)
-        end
-		
-    end
-
     return S, Sz, Szz
 end
 
