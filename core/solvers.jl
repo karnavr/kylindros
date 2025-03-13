@@ -6,22 +6,20 @@ function mySolver(f, initial_guess::Vector{Float64}; solver = :NewtonRaphson, to
 
 	## Solves the system of equations f(x) = 0 using the specified solver (wrapper function)
 
-	x = initial_guess
-
 	if solver == :Newton
-		Newton(f, x, tol = tol, max_iter = max_iter)
+		Newton(f, initial_guess, tol = tol, max_iter = max_iter)
 
 	elseif solver == :NewtonRaphson 
-	    NewtonRaphson(f, x, tol = tol, max_iter = max_iter)
+	    NewtonRaphson(f, initial_guess, tol = tol, max_iter = max_iter)
 
 	elseif solver == :Broyden
-		Broyden(f, x, tol = tol, max_iter = max_iter)
+		Broyden(f, initial_guess, tol = tol, max_iter = max_iter)
 
 	elseif solver == :LevenbergMarquardt
-		LevenbergMarquardt(f, x, tol = tol, max_iter = max_iter)
+		LevenbergMarquardt(f, initial_guess, tol = tol, max_iter = max_iter)
 
 	elseif solver == :Secant
-		Secant(f, x, tol = tol, max_iter = max_iter)
+		Secant(f, initial_guess, tol = tol, max_iter = max_iter)
 
 	else
 		error("Enter which algorithm you want to use!")

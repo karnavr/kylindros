@@ -1,8 +1,8 @@
 "Solves for a bifurcation branch of solutions."
 
-function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-8, solver = :NewtonRaphson, max_iter = 1000)
+function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000)
 
-	## compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess
+	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
 	# check type of the a1Vals argument 
 	if typeof(a1Vals) != Vector{Float64}
@@ -12,14 +12,22 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	end
 
-	# create base file name (num_modes).(tolerance).(branchN).(solver).(max_iter)
-	base_name = "$(constants.N).$(tol).$(branchN).$(solver)"
-	println("$(base_name)")
 
-	# check if the directory exists -> if it does, display a warning
-	if isdir("results/$(base_name)")
-		println("Warning: Solution branch already exists. Overwriting files.")
-		# NOTE: will have to eventually add a check for all the constants, etc.
+	# check if the solution branch already exists
+	existing_filename = solutionExists(constants, branchN, tol)
+
+	# if the solution branch already exists, return the existing solution branch
+	if existing_filename != false
+
+		println("Solution branch already exists.")
+
+		model_name = getModelName(constants)
+		full_existing_filename = "results/$(model_name)/$(existing_filename)"
+
+		println("File: $(full_existing_filename)")
+
+		return load(full_existing_filename)["solutions"]
+		
 	end
 	
 	# initialize solution array
@@ -30,6 +38,9 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	# initialize flags array
 	flags = randn(branchN)
+
+	# start timer
+	start_time = time()
 	
 	for i = 1:branchN
 
@@ -58,6 +69,9 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	end
 
+	# end timer and compute time 
+	computation_time = time() - start_time
+
 	# compute error for each branch point
 	errors = zeros(branchN)
 
@@ -70,6 +84,8 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	metadata = Dict(
 		"model" => getModelName(constants),
+		"timestamp" => getCurrentDateToString(),
+		"computation_time" => computation_time,
 		"solver" => solver,
 		"max_iter" => max_iter,
 		"tol" => tol,
@@ -77,15 +93,14 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 		"a1Vals" => a1Vals,
 		"iterations" => iterations,
 		"errors" => errors,
-		"flags" => flags
+		"flags" => flags,
 	)
 
-	results_dict = createResultsDict(constants, solutions, metadata)
-	filename = generateFileName(results_dict)
+	filename = generateFileName(metadata)
 
-	@save "results/$(filename).jld2" results_dict
+	# Save the components directly at the top level
+	@save "results/$(metadata["model"])/$(filename).jld2" solutions constants metadata
 
-
-	return solutions, iterations
+	return solutions
 
 end

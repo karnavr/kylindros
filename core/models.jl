@@ -6,7 +6,7 @@ abstract type Constants end
 
 struct ferrofluidConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Real                   # half-domain length
+	L::Real                   	# half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
@@ -44,7 +44,7 @@ end
 
 struct fuConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Real                   # half-domain length
+	L::Real                   	# half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
@@ -118,7 +118,7 @@ end
 
 struct fuSimpleConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Real                   # half-domain length
+	L::Real                   	# half-domain length
 	
 	# domain definition
 	dz::Float64 				# domain spacing
