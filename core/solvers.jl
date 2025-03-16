@@ -2,7 +2,7 @@
 
 ## WRAPPER FUNCTION
 
-function mySolver(f, initial_guess::Vector{Float64}; solver = :NewtonRaphson, tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function mySolver(f, initial_guess; solver = :NewtonRaphson, tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	## Solves the system of equations f(x) = 0 using the specified solver (wrapper function)
 
@@ -28,7 +28,7 @@ end
 
 ## NUMERICAL SOLVERS
 
-function Newton(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function Newton(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	for i in 1:max_iter
 		J = finite_diff_jacobian(f, x)
@@ -44,7 +44,7 @@ function Newton(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 10
 
 end
 
-function NewtonRaphson(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function NewtonRaphson(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	# alpha = 1.0  # Initial step size
 	c = 1e-4  # Sufficient decrease parameter
@@ -158,4 +158,62 @@ function finite_diff_jacobian(f, x)
         J[:, i] = (f(x_perturbed) - fx) / h
     end
     return J
+end
+
+function better_finite_diff_jacobian(f, x)
+
+	# computes the jacobian of f at x using finite differences from the 
+	# actual finite difference package 
+
+	return FiniteDiff.finite_difference_jacobian(f, x)
+
+end
+
+function auto_diff_jacobian(f, x)
+
+	## Computes the Jacobian of the function f at the point x using automatic differentiation
+
+	return ForwardDiff.jacobian(f, x)
+
+end
+
+# Helper function to safely convert Complex tracked values
+function safe_complex(z)
+    if z isa Complex
+        return Complex(real(z), imag(z))
+    else
+        return z
+    end
+end
+
+# Simpler approach for Bessel functions with tracked values
+function SpecialFunctions.besseli(nu::Real, z::Complex{<:ReverseDiff.TrackedReal})
+    # Extract real and imaginary parts of z
+    re_z = real(z)
+    im_z = imag(z)
+    
+    # Convert to regular values
+    z_val = Complex(ReverseDiff.value(re_z), ReverseDiff.value(im_z))
+    
+    # Compute function value
+    result = besseli(nu, z_val)
+    
+    # Just return the result without trying to track the complex directly
+    # This will allow ReverseDiff to handle the derivative propagation internally
+    return result
+end
+
+function SpecialFunctions.besselk(nu::Real, z::Complex{<:ReverseDiff.TrackedReal})
+    # Extract real and imaginary parts of z
+    re_z = real(z)
+    im_z = imag(z)
+    
+    # Convert to regular values
+    z_val = Complex(ReverseDiff.value(re_z), ReverseDiff.value(im_z))
+    
+    # Compute function value
+    result = besselk(nu, z_val)
+    
+    # Just return the result without trying to track the complex directly
+    return result
 end

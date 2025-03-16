@@ -68,8 +68,11 @@ function solutionExists(constants::Constants, branchN::Int64, tol::Float64)
                        saved_results["metadata"]["branchN"] == branchN
                         return file
                     end
+
                 end
+
             end
+            
         end
     end
 

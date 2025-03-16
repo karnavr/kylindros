@@ -1,6 +1,6 @@
 "General equations for the cylindrical AFM formulation for an arbitrary wall model."
 
-function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float64, a₀::Float64)
+function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 
 	# Returns the N + 2 equations that we want to solve for:
 
@@ -20,9 +20,11 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 
 	S, Sz, _ = fourierSeries(coeffs, z, L)
 
-	integrands = zeros(N, length(z)) # N integrands for k = 1:N
-	integrals = zeros(N) 			 # N integrals (array gets condensed on the z-axis)
-	eqs = zeros(N+2) 				 # integrands + 2 extra equations I define later
+	# Use the element type of unknowns for the output arrays
+	T = eltype(unknowns)
+	integrands = zeros(T, N, length(z))  # Use the same type as unknowns
+	integrals = zeros(T, N)              # Use the same type as unknowns
+	eqs = zeros(T, N+2)                  # Use the same type as unknowns
 
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);

@@ -5,6 +5,11 @@ using Trapz
 using LinearAlgebra
 using Statistics
 
+using ForwardDiff
+using ReverseDiff
+using Zygote
+using FiniteDiff
+
 using DelimitedFiles, JSON
 using JLD2
 

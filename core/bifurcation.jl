@@ -1,6 +1,6 @@
 "Solves for a bifurcation branch of solutions."
 
-function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000)
+function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000)
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
@@ -45,10 +45,10 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 	for i = 1:branchN
 
 		# define the set of equations/function to solve: f(x) = 0
-		f(u::Vector{Float64}) = equations(u::Vector{Float64}, constants::Constants, a1Vals[i], 1.0) 
+		f(u) = equations(u, constants::Constants, a1Vals[i], 1.0) 
 
 		# solve for the current branch point + capture
-		solutions[i,:], iterations[i], flags[i] = mySolver(f::Function, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
+		solutions[i,:], iterations[i], flags[i] = mySolver(f, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
 
 		# update intial guess 
 		initial_guess[i+1,:] = solutions[i,:]

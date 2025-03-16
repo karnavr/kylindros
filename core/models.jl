@@ -161,7 +161,7 @@ function c0(k, constants::fuSimpleConstants)
 	
 end
 
-function wall_model(constants::fuSimpleConstants, c::Float64, S::Vector{Float64})
+function wall_model(constants::fuSimpleConstants, c, S::Vector)
 
 	λ2 = constants.λ2
 	vf = constants.vf

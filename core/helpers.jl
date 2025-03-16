@@ -8,14 +8,16 @@ function β(n, k, b, S0)
 	return real.(beta1 .+ beta2)
 end
 
-function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L::Real)
+function fourierSeries(coefficients, domain::Vector, L::Real)
 	
     N = length(coefficients) - 1
 	n_domain = Int(length(domain))
 	
-    S = zeros(n_domain)  	# profile S
-    Sz = zeros(n_domain)  	# first derivative Sz	
-    Szz = zeros(n_domain)  	# second derivative Szz
+    # Use the element type of coefficients for the output arrays
+    T = eltype(coefficients)
+    S = zeros(T, n_domain)  	# profile S
+    Sz = zeros(T, n_domain)  	# first derivative Sz	
+    Szz = zeros(T, n_domain)  	# second derivative Szz
 
 	k_values = [(n*π/L) for n in 1:N]
 	
