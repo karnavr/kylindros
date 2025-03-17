@@ -106,8 +106,49 @@ function plot_error(solutions, metadata)
 	return p
 end
 
-# function plot_dispersion(wall_model, )
-# end
+
+## DISPERSION RELATIONS
+
+# ferrofluid
+function plot_dispersion(k_range, constants::ferrofluidConstants; vary_param::Symbol = :B, param_range = range(1, 30, length=5))
+
+	"Plots the dispersion relation for a the ferrofluid problem with a varying parameter."
+
+	# unpack constants for the constants struct
+	N = constants.N
+	L = constants.L
+	b = constants.b
+	B = constants.B
+
+	# initialize array for speeds
+	speeds = zeros(length(param_range), length(k_range))
+
+	for (i, param_value) in enumerate(param_range)
+
+		# create constants struct based on which parameter we are varying
+		if vary_param == :B
+			constants = ferrofluidConstants(N, L, param_value, b)
+		elseif vary_param == :b
+			constants = ferrofluidConstants(N, L, B, param_value)
+		end
+		
+		# compute speeds
+		speeds[i,:] .= c0(k_range, constants)
+	end
+
+	# plot speeds
+	p = plot(legend=:outertopright)
+	param_name = String(vary_param)
+
+	for (i, param_value) in enumerate(param_range)
+		plot!(k_range, speeds[i,:], 
+			xlabel="Wavenumber (k)", 
+			ylabel="Wave speed (c₀)", 
+			label="$param_name = $(param_value)", lw=2)
+	end
+
+	return p
+end
 
 ## LEGACY 
 

@@ -56,12 +56,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
         # print progress for every 10% of branch points 
         if i % Int(round(0.1*branchN)) == 0
             println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
-			# initial_guess[i+1, end - Int(round(0.2*length(initial_guess[1,:]))):end] .= 0
         end
 
-		# check the average values of the last 20% of coefficients every 1% of branch points
+		# check the average values of the last 20% of coefficients every 5% of branch points
 		# and if it's above 1e-15, zero the last 20% of coefficients
-		if i % max(1, Int(round(0.01*branchN))) == 0 # max() to ensure it's always greater than 1
+		if i % max(1, Int(round(0.05*branchN))) == 0 # max() to ensure it's always greater than 1
 			if mean(abs.(initial_guess[i, end - Int(round(0.2*length(initial_guess[1,:]))):end])) > 1e-15
 				initial_guess[i+1, end - Int(round(0.2*length(initial_guess[1,:]))):end] .= 0
 			end

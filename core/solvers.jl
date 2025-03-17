@@ -21,6 +21,9 @@ function mySolver(f, initial_guess; solver = :NewtonRaphson, tol::Float64 = 1e-8
 	elseif solver == :Secant
 		Secant(f, initial_guess, tol = tol, max_iter = max_iter)
 
+	elseif solver == :JuliaSolver
+		
+
 	else
 		error("Enter which algorithm you want to use!")
 	end

@@ -13,9 +13,9 @@ struct ferrofluidConstants <: Constants
 	z::Vector{Float64} 			# domain vector of values (2N + 2 points)
 
 	# magnetic constants 
-	B::Float64 					# Bond number 
+	B::Float64 					# Bond number
 	b::Float64 					# inner rod radius
-	E::Float64                  # Bernoulli constant 
+	E::Float64                  # Bernoulli constant
 	
 	
 	function ferrofluidConstants(N::Int64, L::Real, B::Float64, b::Float64)
@@ -34,7 +34,7 @@ function c0(k, constants::ferrofluidConstants)
 	B = constants.B
 	b = constants.b
 	
-	c0 = sqrt.((1 ./ k).*((-β(1,k,b,1) ./ β(0,k,b,1)) .* (k.^2 .- 1 .+ B)))
+	c0 = real.(sqrt.(Complex.((1 ./ k).*((-β(1,k,b,1) ./ β(0,k,b,1)) .* (k.^2 .- 1 .+ B)))))
 
 	return c0
 	
