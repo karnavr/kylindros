@@ -100,6 +100,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 
 	# Save the components directly at the top level
 	@save "results/$(metadata["model"])/$(filename).jld2" solutions constants metadata
+	println("Saved solution branch to $(filename).jld2")
 
 	return solutions
 

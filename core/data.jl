@@ -98,3 +98,12 @@ function compareConstants(constants1::Constants, constants2::Constants)
     return true
 end
 
+function readSolution(file_path::String)
+
+    "Reads a solution from a file and returns the constants and metadata."
+
+    # load the file
+    saved_results = load(file_path)
+    
+    return saved_results["solutions"], saved_results["constants"], saved_results["metadata"]
+end
