@@ -67,7 +67,7 @@ function plot_branch(solutions, metadata)
 	return p
 end
 
-function plot_coeffs(solutions, index::Int)
+function plot_coeffs(solutions, indices)
 
 	## plot the coefficients of the solutions
 
@@ -76,7 +76,20 @@ function plot_coeffs(solutions, index::Int)
 
 	# plot the coefficients
 	p = plot(legend=false, size = (500,500))
-	scatter!(abs.(coeffs[index,:]), yaxis=:log)
+	for index in indices
+		plot!(abs.(coeffs[index,:]), 
+			yaxis=:log, 
+			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+			marker = :circle,
+			markersize = 3,
+			markerstrokewidth = 0,
+			markerstrokealpha = 0)
+	end
+
+	# only show legend if there is more than one index
+	if length(indices) > 1
+		plot!(legend = true)
+	end
 
 	xlabel!("n")
 	ylabel!(L"a_n")
@@ -94,8 +107,8 @@ function plot_error(solutions, metadata)
 
 	# plot error over the branch with both line and markers
 	p = plot(a1, errors, 
-		lw=2,                    # line width
-		marker=:circle,          # marker style
+		lw=2,                   # line width
+		marker=:circle,         # marker style
 		markersize=2,           # marker size
 		yaxis=:log10,           # log scale y-axis
 		legend=false)           # no legend
