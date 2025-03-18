@@ -1,6 +1,6 @@
 "Solves for a bifurcation branch of solutions."
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000)
+function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000, overwrite = false)
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
@@ -16,18 +16,20 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	# check if the solution branch already exists
 	existing_filename = solutionExists(constants, branchN, tol)
 
-	# if the solution branch already exists, return the existing solution branch
+	# if the solution branch already exists, return the existing solution or delete it based on overwrite flag
 	if existing_filename != false
-
-		println("Solution branch already exists.")
-
 		model_name = getModelName(constants)
 		full_existing_filename = "results/$(model_name)/$(existing_filename)"
-
-		println("File: $(full_existing_filename)")
-
-		return load(full_existing_filename)["solutions"]
 		
+		if !overwrite
+			println("Solution branch already exists.")
+			println("File: $(full_existing_filename)")
+			return load(full_existing_filename)["solutions"], load(full_existing_filename)["constants"], load(full_existing_filename)["metadata"]
+		else
+			println("Solution branch already exists, but overwrite flag is set.")
+			println("Deleting existing file: $(full_existing_filename)")
+			rm(full_existing_filename)
+		end
 	end
 	
 	# initialize solution array
@@ -54,7 +56,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		initial_guess[i+1,:] = solutions[i,:]
 
         # print progress for every 10% of branch points 
-        if i % Int(round(0.1*branchN)) == 0
+        if i % Int(round(0.01*branchN)) == 0
             println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
         end
 
@@ -101,6 +103,6 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	@save "results/$(metadata["model"])/$(filename).jld2" solutions constants metadata
 	println("Saved solution branch to $(filename).jld2")
 
-	return solutions
+	return solutions, constants, metadata
 
 end
