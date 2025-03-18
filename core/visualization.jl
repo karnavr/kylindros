@@ -30,10 +30,12 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true)
 		profiles = [profiles[:,Int(end/2)+1:end] profiles[:,1:Int(end/2)]]; nothing
 	end
 
+	linestyles = [:dashdot, :dash, :solid]
+
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
-	for i in indices
-		plot!(z, profiles[i,:], label = "a₁ = $(round(solutions[i,3], digits=3))", lw=2)
+	for (i, index) in enumerate(indices)
+		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i])
 	end
 	xlabel!(L"z"); ylabel!(L"S")
 
