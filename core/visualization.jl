@@ -69,7 +69,7 @@ function plot_branch(solutions, metadata)
 	return p
 end
 
-function plot_coeffs(solutions, indices)
+function plot_coeffs(solutions, indices = round.(Int, range(1, size(solutions,1), length=5)))
 
 	## plot the coefficients of the solutions
 
@@ -121,6 +121,19 @@ function plot_error(solutions, metadata)
 	return p
 end
 
+## Plot everything 
+
+function plotEverything(solutions, constants, metadata)
+
+	profileplot = plot_profiles(solutions, constants, shift_profiles = true)
+	branchplot = plot_branch(solutions, metadata)
+	coeffplot = plot_coeffs(solutions, 1:10:100)
+	errorplot = plot_error(solutions, metadata)
+
+	p = plot(profileplot, branchplot, coeffplot, errorplot, layout = (2,2), size = (1000,1000))
+
+	return p
+end
 
 ## DISPERSION RELATIONS
 
