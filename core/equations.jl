@@ -1,16 +1,11 @@
-"General equations for the cylindrical AFM formulation for an arbitrary wall model."
+"General equations for the cylindrical AFM formulation with an arbitrary wall model."
 
 function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 
 	# Returns the N + 2 equations that we want to solve for:
 
-	# problem constants 
-	z = constants.z::Vector{Float64}
-	N = constants.N::Int64
-	b = constants.b::Float64
-	L = constants.L::Number
-	λ2 = constants.λ2::Float64
-	vf = constants.vf::Float64
+	# problem constants (unpack and assign to variables)
+	unpackConstants(constants)
 
 	c = unknowns[1]
 	coeffs = unknowns[2:N+2] # N + 1 coeffs
@@ -18,7 +13,7 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
-	S, Sz, _ = fourierSeries(coeffs, z, L)
+	S, Sz, Szz = fourierSeries(coeffs, z, L)
 
 	# Use the element type of unknowns for the output arrays
 	T = eltype(unknowns)

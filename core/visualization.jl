@@ -79,9 +79,9 @@ function plot_coeffs(solutions, indices = round.(Int, range(1, size(solutions,1)
 	# plot the coefficients
 	p = plot(legend=false, size = (500,500))
 	for index in indices
-		plot!(abs.(coeffs[index,:]), 
+		plot!(abs.(coeffs[Int(index),:]), 
 			yaxis=:log, 
-			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+			label = "a₁ = $(round(solutions[Int(index),3], digits=3))", 
 			marker = :circle,
 			markersize = 3,
 			markerstrokewidth = 0,
@@ -125,7 +125,7 @@ end
 
 function plotEverything(solutions, constants, metadata)
 
-	branchN = metadata["branchN"]
+	branchN = Int(metadata["branchN"])
 
 	profileplot = plot_profiles(solutions, constants, shift_profiles = true)
 	branchplot = plot_branch(solutions, metadata)
