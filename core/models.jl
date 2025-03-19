@@ -40,6 +40,19 @@ function c0(k, constants::ferrofluidConstants)
 	
 end
 
+function wall_model(constants::ferrofluidConstants, c::Float64, S::Vector{Float64}, Sz::Vector{Float64}, Szz::Vector{Float64}, Szsq::Vector{Float64})
+
+	## wall model for ferrofluid
+
+	B = constants.B
+	E = constants.E
+
+	w = - 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E
+	
+	return w
+	
+end
+
 ## FU & IL'ICHEV
 
 struct fuConstants <: Constants
@@ -89,7 +102,7 @@ function c0(k, constants::fuConstants)
 	
 end
 
-function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
+function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64}, Sz::Vector{Float64}, Szz::Vector{Float64}, Szsq::Vector{Float64})
 
 	λ2 = constants.λ2
 	vf = constants.vf
@@ -146,7 +159,7 @@ function c0(k, constants::fuSimpleConstants)
 	
 end
 
-function wall_model(constants::fuSimpleConstants, c, S::Vector)
+function wall_model(constants::fuSimpleConstants, c, S::Vector, Sz::Vector, Szz::Vector, Szsq::Vector)
 
 	λ2 = constants.λ2
 	vf = constants.vf
@@ -155,6 +168,9 @@ function wall_model(constants::fuSimpleConstants, c, S::Vector)
 
 	return w
 end
+
+
+## UNPACK CONSTANTS (GENERAL)
 
 function unpackConstants(constants)
 
