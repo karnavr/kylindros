@@ -1,4 +1,5 @@
 using Plots, LaTeXStrings
+using Plots.PlotMeasures
 
 using SpecialFunctions
 using Trapz
