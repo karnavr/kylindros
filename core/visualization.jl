@@ -125,9 +125,11 @@ end
 
 function plotEverything(solutions, constants, metadata)
 
+	branchN = metadata["branchN"]
+
 	profileplot = plot_profiles(solutions, constants, shift_profiles = true)
 	branchplot = plot_branch(solutions, metadata)
-	coeffplot = plot_coeffs(solutions, 1:10:100)
+	coeffplot = plot_coeffs(solutions, 1:(branchN/10):branchN)
 	errorplot = plot_error(solutions, metadata)
 
 	p = plot(profileplot, branchplot, coeffplot, errorplot, layout = (2,2), size = (1000,1000))

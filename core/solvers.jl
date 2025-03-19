@@ -2,28 +2,25 @@
 
 ## WRAPPER FUNCTION
 
-function mySolver(f, initial_guess; solver = :NewtonRaphson, tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function mySolver(f, initial_guess; solver = :myNewtonRaphson, tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	## Solves the system of equations f(x) = 0 using the specified solver (wrapper function)
 
-	if solver == :Newton
-		Newton(f, initial_guess, tol = tol, max_iter = max_iter)
+	if solver == :myNewton
+		myNewton(f, initial_guess, tol = tol, max_iter = max_iter)
 
-	elseif solver == :NewtonRaphson 
-	    NewtonRaphson(f, initial_guess, tol = tol, max_iter = max_iter)
+	elseif solver == :myNewtonRaphson 
+	    myNewtonRaphson(f, initial_guess, tol = tol, max_iter = max_iter)
 
-	elseif solver == :Broyden
-		Broyden(f, initial_guess, tol = tol, max_iter = max_iter)
+	elseif solver == :myBroyden
+		myBroyden(f, initial_guess, tol = tol, max_iter = max_iter)
 
-	elseif solver == :LevenbergMarquardt
-		LevenbergMarquardt(f, initial_guess, tol = tol, max_iter = max_iter)
+	elseif solver == :myLevenbergMarquardt
+		myLevenbergMarquardt(f, initial_guess, tol = tol, max_iter = max_iter)
 
-	elseif solver == :Secant
-		Secant(f, initial_guess, tol = tol, max_iter = max_iter)
-
-	elseif solver == :JuliaSolver
+	elseif solver == :mySecant
+		mySecant(f, initial_guess, tol = tol, max_iter = max_iter)
 		
-
 	else
 		error("Enter which algorithm you want to use!")
 	end
@@ -31,7 +28,7 @@ end
 
 ## NUMERICAL SOLVERS
 
-function Newton(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function myNewton(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	for i in 1:max_iter
 		J = finite_diff_jacobian(f, x)
@@ -47,7 +44,7 @@ function Newton(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 end
 
-function NewtonRaphson(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function myNewtonRaphson(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	# alpha = 1.0  # Initial step size
 	c = 1e-4  # Sufficient decrease parameter
@@ -74,7 +71,7 @@ function NewtonRaphson(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 end
 
-function Broyden(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function myBroyden(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	J = finite_diff_jacobian(f, x)
 
@@ -94,7 +91,7 @@ function Broyden(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1
 
 end
 
-function LevenbergMarquardt(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function myLevenbergMarquardt(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	λ = 1e-3  # Initial damping factor
 		ν = 2.0   # Damping factor increment
@@ -123,7 +120,7 @@ function LevenbergMarquardt(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter
 
 end
 
-function Secant(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function mySecant(f, x::Vector{Float64}; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
 
 	δx = ones(length(x)) * 1e-4
 		for i in 1:max_iter

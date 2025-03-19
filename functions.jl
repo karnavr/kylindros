@@ -5,6 +5,8 @@ using Trapz
 using LinearAlgebra
 using Statistics
 
+using NonlinearSolve
+
 using ForwardDiff
 using ReverseDiff
 using Zygote

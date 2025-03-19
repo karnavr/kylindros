@@ -1,6 +1,6 @@
 "Solves for a bifurcation branch of solutions."
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :NewtonRaphson, max_iter = 1000, overwrite = false)
+function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false)
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
@@ -46,23 +46,44 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	
 	for i = 1:branchN
 
-		# define the set of equations/function to solve: f(x) = 0
-		f(u) = equations(u, constants::Constants, a1Vals[i], 1.0) 
+		
+		if solver == :NLSolver
 
-		# solve for the current branch point + capture
-		solutions[i,:], iterations[i], flags[i] = mySolver(f, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
+			# define the set of equations/function to solve: f(x) = 0
+			f(u, p) = equations(u, constants, a1Vals[i], 1.0)
+
+			# define the problem
+			problem = NonlinearProblem(f, initial_guess[i,:])
+
+			# solve the problem with more conservative settings
+			sol = solve(problem, NewtonRaphson(; autodiff = AutoFiniteDiff()))
+			# sol = solve(problem, LevenbergMarquardt(; autodiff = AutoFiniteDiff()))
+
+			solutions[i,:] = sol.u
+			iterations[i] = sol.stats.nsteps
+			# flags[i] = sol.stats.status
+
+		else
+
+			# define the set of equations/function to solve: f(x) = 0
+			func(u) = equations(u, constants::Constants, a1Vals[i], 1.0)
+
+			# solve for the current branch point + capture
+			solutions[i,:], iterations[i], flags[i] = mySolver(func, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
+			
+		end
 
 		# update intial guess 
 		initial_guess[i+1,:] = solutions[i,:]
 
         # print progress for every 10% of branch points 
-        if i % Int(round(0.01*branchN)) == 0
+        if i % Int(round(0.1*branchN)) == 0
             println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
         end
 
 		# check the average values of the last 20% of coefficients every 5% of branch points
 		# and if it's above 1e-15, zero the last 20% of coefficients
-		if i % max(1, Int(round(0.05*branchN))) == 0 # max() to ensure it's always greater than 1
+		if i % max(1, Int(round(0.02*branchN))) == 0 # max() to ensure it's always greater than 1
 			if mean(abs.(initial_guess[i, end - Int(round(0.2*length(initial_guess[1,:]))):end])) > 1e-15
 				initial_guess[i+1, end - Int(round(0.2*length(initial_guess[1,:]))):end] .= 0
 			end
