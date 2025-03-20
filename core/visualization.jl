@@ -180,6 +180,48 @@ function plot_dispersion(k_range, constants::ferrofluidConstants; vary_param::Sy
 	return p
 end
 
+#fu 
+function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :B, param_range = range(1, 30, length=5))
+
+	"Plots the dispersion relation for a the ferrofluid problem with a varying parameter."
+
+	# unpack constants for the constants struct
+	unpackConstants(constants)
+
+	# initialize array for speeds
+	speeds = zeros(length(param_range), length(k_range))
+
+	for (i, param_value) in enumerate(param_range)
+
+		# create constants struct based on which parameter we are varying
+		if vary_param == :λ1
+			constants = fuConstants(N, L, b, param_value, λ2, vf)
+		elseif vary_param == :λ2
+			constants = fuConstants(N, L, b, λ1, param_value, vf)
+		elseif vary_param == :vf
+			constants = fuConstants(N, L, b, λ1, λ2, param_value)
+		elseif vary_param == :b
+			constants = fuConstants(N, L, param_value, λ1, λ2, vf)
+		end
+		
+		# compute speeds
+		speeds[i,:] .= c0(k_range, constants)
+	end
+
+	# plot speeds
+	p = plot(legend=:outertopright)
+	param_name = String(vary_param)
+
+	for (i, param_value) in enumerate(param_range)
+		plot!(k_range, speeds[i,:], 
+			xlabel="Wavenumber (k)", 
+			ylabel="Wave speed (c₀)", 
+			label="$param_name = $(param_value)", lw=2)
+	end
+
+	return p
+end
+
 ## LEGACY 
 
 function plotting(solutions, index::Int, constants::Constants, shift_profiles = true)

@@ -47,7 +47,7 @@ function wall_model(constants::ferrofluidConstants, c::Float64, S::Vector{Float6
 	B = constants.B
 	E = constants.E
 
-	w = - 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E
+	w = -1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E
 	
 	return w
 	
@@ -87,22 +87,22 @@ function c0(k, constants::fuConstants)
 	λ2 = constants.λ2
 	vf = constants.vf
 
-	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
-	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
+	β0 = besseli.(1, k) .* besselk.(1, k*b) .- besseli.(1, k*b) .* besselk.(1, k)
+	β1 = besseli.(1, k*b) .* besselk.(0, k) .+ besseli.(0, k) .* besselk.(1, k*b) .- (1/k)*β0
 
 	# quadratic coeffs (Ac^2 + Bc + D) 
-	A = k*β1 - ((2*λ2^2 * β0) ./ λ1) + β0
-	B = (4 * vf * λ2 * β0) ./ λ1
-	D = -2 * vf^2 * β0 ./ λ1
+	A = k.*β1 - ((2*λ2.^2 .* β0) ./ λ1) .+ β0
+	B = (4 .* vf .* λ2 .* β0) ./ λ1
+	D = -2 .* vf.^2 .* β0 ./ λ1
 
 	# solve quadratic equation 
 	c0 = solve_quadratic(A, B, D)
 
-	return real(c0)
+	return real.(c0)
 	
 end
 
-function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64}, Sz::Vector{Float64}, Szz::Vector{Float64}, Szsq::Vector{Float64})
+function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
 
 	λ2 = constants.λ2
 	vf = constants.vf
@@ -159,7 +159,7 @@ function c0(k, constants::fuSimpleConstants)
 	
 end
 
-function wall_model(constants::fuSimpleConstants, c, S::Vector, Sz::Vector, Szz::Vector, Szsq::Vector)
+function wall_model(constants::fuSimpleConstants, c, S)
 
 	λ2 = constants.λ2
 	vf = constants.vf

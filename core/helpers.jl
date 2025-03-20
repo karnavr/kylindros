@@ -77,7 +77,17 @@ function recompute_solutions(file_path::String)
 
 end
 
-function solve_quadratic(a, b, c)
+function solve_quadratic(a::AbstractArray, b::AbstractArray, c::AbstractArray)
+    Δ = b.^2 - 4 .* a .* c
+    if any(Δ .< 0)
+		print("Solution (c0?) is complex!")
+        return Complex.((-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a))  # Return complex roots
+    else
+        return (-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a)  # Return real roots
+    end
+end
+
+function solve_quadratic(a::Number, b::Number, c::Number)
     Δ = b^2 - 4*a*c
     if Δ < 0
 		print("Solution (c0?) is complex!")

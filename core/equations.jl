@@ -25,13 +25,10 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	Szsq = 1 .+ (Sz.^2);
 
 	# define wall model
-
 	if constants isa ferrofluidConstants
-
 		one_p = (Szsq).*((c.^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
-
 	else 
-		w = wall_model(constants, c, S, Sz, Szz, Szsq)
+		w = wall_model(constants, c, S)
 		one_p = Szsq .* (c^2 .- 2 .* w)
 	end
 	
