@@ -87,13 +87,13 @@ function c0(k, constants::fuConstants)
 	λ2 = constants.λ2
 	vf = constants.vf
 
-	β0 = besseli.(1, k) .* besselk.(1, k*b) .- besseli.(1, k*b) .* besselk.(1, k)
-	β1 = besseli.(1, k*b) .* besselk.(0, k) .+ besseli.(0, k) .* besselk.(1, k*b) .- (1/k)*β0
+	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
+	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
 
 	# quadratic coeffs (Ac^2 + Bc + D) 
-	A = k.*β1 - ((2*λ2.^2 .* β0) ./ λ1) .+ β0
-	B = (4 .* vf .* λ2 .* β0) ./ λ1
-	D = -2 .* vf.^2 .* β0 ./ λ1
+	A = k*β1 - ((2*λ2^2 * β0) / λ1) + β0
+	B = (4 * vf * λ2 * β0) / λ1
+	D = -2 * vf^2 * β0 / λ1
 
 	# solve quadratic equation 
 	c0 = solve_quadratic(A, B, D)
@@ -155,8 +155,7 @@ function c0(k, constants::fuSimpleConstants)
 	# solve quadratic equation 
 	c0 = solve_quadratic(A, B, D)
 
-	return real(c0)
-	
+	return real.(c0)
 end
 
 function wall_model(constants::fuSimpleConstants, c, S)

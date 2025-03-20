@@ -163,7 +163,11 @@ function plot_dispersion(k_range, constants::ferrofluidConstants; vary_param::Sy
 		end
 		
 		# compute speeds
-		speeds[i,:] .= c0(k_range, constants)
+		# speeds[i,:] .= c0(k_range, constants)
+
+		for (j, k) in enumerate(k_range)
+			speeds[i, j] = c0(k, constants)
+		end
 	end
 
 	# plot speeds
@@ -180,10 +184,52 @@ function plot_dispersion(k_range, constants::ferrofluidConstants; vary_param::Sy
 	return p
 end
 
-#fu 
-function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :B, param_range = range(1, 30, length=5))
+#fuSimple
+function plot_dispersion(k_range, constants::fuSimpleConstants; vary_param::Symbol = :λ1, param_range = range(0.1, 2.0, length=5))
 
-	"Plots the dispersion relation for a the ferrofluid problem with a varying parameter."
+	"Plots the dispersion relation for the fu and il'ichev model with a varying parameter."
+
+	# unpack constants for the constants struct
+	unpackConstants(constants)
+
+	# initialize array for speeds
+	speeds = zeros(length(param_range), length(k_range))
+
+	for (i, param_value) in enumerate(param_range)
+
+		# create constants struct based on which parameter we are varying
+		if vary_param == :λ1
+			constants = fuSimpleConstants(N, L, b, param_value, vf)
+		elseif vary_param == :λ2
+			constants = fuSimpleConstants(N, L, b, λ2, param_value)
+		elseif vary_param == :vf
+			constants = fuSimpleConstants(N, L, b, λ2, param_value)
+		end
+		
+		# compute speeds
+		for (j, k) in enumerate(k_range)
+			speeds[i, j] = c0(k, constants)
+		end
+	end
+
+	# plot speeds
+	p = plot(legend=:outertopright)
+	param_name = String(vary_param)
+
+	for (i, param_value) in enumerate(param_range)
+		plot!(k_range, speeds[i,:], 
+			xlabel="Wavenumber (k)", 
+			ylabel="Wave speed (c₀)", 
+			label="$param_name = $(param_value)", lw=2)
+	end
+
+	return p
+end 
+
+#fu 
+function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :b, param_range = range(0.01, 1.0, length=5))
+
+	"Plots the dispersion relation for the fu and il'ichev model with a varying parameter."
 
 	# unpack constants for the constants struct
 	unpackConstants(constants)
@@ -205,7 +251,11 @@ function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :
 		end
 		
 		# compute speeds
-		speeds[i,:] .= c0(k_range, constants)
+		# speeds[i,:] .= c0(k_range, constants)
+
+		for (j, k) in enumerate(k_range)
+			speeds[i, j] = c0(k, constants)
+		end
 	end
 
 	# plot speeds
