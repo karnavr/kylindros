@@ -1,5 +1,17 @@
 "Functions for solution data saving and loading"
 
+function results_dir(subdir::String = "")
+
+    "Return the absolute path to the results directory, optionally within a subdirectory."
+
+    base = joinpath(dirname(@__DIR__), "results")
+    if isempty(subdir)
+        return base
+    else
+        return joinpath(base, subdir)
+    end
+end
+
 function generateFileName(metadata::Dict{String, Any})
 
     "creates a unique filename based on the model name and current date/time"
@@ -35,27 +47,28 @@ function getCurrentDateToString()
     return date_string
 end
 
-function solutionExists(constants::Constants, branchN::Int64, tol::Float64) 
+function solutionExists(constants::Constants, branchN::Int64, tol::Float64; subdir::String = "") 
 
     "Loops through all the files in the results directory and checks if a solution exists for the given constants. 
     
     If it does, it returns the filename. If it doesn't, it returns false."
 
-    # get the model name
+    # get the model name and target directory
     model_name = getModelName(constants)
+    search_dir = joinpath(results_dir(subdir), model_name)
     
     # Check if the directory exists
-    if !isdir("results/$(model_name)")
+    if !isdir(search_dir)
         return false
     end
 
     # loop through all the files in the results/model_name directory
-    for file in readdir("results/$(model_name)")
+    for file in readdir(search_dir)
 
         if endswith(file, ".jld2")
             
             # load the file
-            saved_results = load("results/$(model_name)/$(file)")
+            saved_results = load(joinpath(search_dir, file))
             
             # Now we can directly access the components
             if haskey(saved_results, "constants") && haskey(saved_results, "metadata")

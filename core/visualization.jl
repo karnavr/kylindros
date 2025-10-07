@@ -35,7 +35,7 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true)
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
 	for (i, index) in enumerate(indices)
-		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i])
+		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i], color = :steelblue)
 	end
 	xlabel!(L"z"); ylabel!(L"S")
 
@@ -133,6 +133,212 @@ function plotEverything(solutions, constants, metadata)
 	errorplot = plot_error(solutions, metadata)
 
 	p = plot(profileplot, branchplot, coeffplot, errorplot, layout = (2,2), size = (1000,1000))
+
+	return p
+end
+
+function plot_comparison_wrapper(solutions, constants::Constants; 
+                                indices = [Int(round(0.75*size(solutions,1))), size(solutions,1)],
+                                shift_profiles = true,
+                                save_figure = false,
+                                filename = nothing,
+                                figure_size = (1200, 800))
+
+	## Create a figure comparing profiles and coefficients for multiple solutions
+	
+	# Validate inputs
+	if save_figure && filename === nothing
+		error("filename must be provided when save_figure=true")
+	end
+	
+	if length(indices) < 1
+		error("at least 1 index must be provided")
+	end
+	
+	branchN = size(solutions, 1)
+	for idx in indices
+		if idx < 1 || idx > branchN
+			error("index $idx is out of bounds (1:$branchN)")
+		end
+	end
+	
+	# Calculate y-axis limits for consistent scaling across all profiles
+	L = constants.L
+	z = constants.z
+	all_profiles = []
+	
+	for idx in indices
+		coeffs = solutions[idx, 2:end]
+		profile = fourierSeries(coeffs, z, L)[1]
+		if shift_profiles
+			profile = [profile[Int(end/2)+1:end]; profile[1:Int(end/2)]]
+		end
+		push!(all_profiles, profile)
+	end
+	
+	# Find global y-limits
+	global_min = minimum(minimum.(all_profiles))
+	global_max = maximum(maximum.(all_profiles))
+	y_margin = 0.05 * (global_max - global_min)
+	ylims = (global_min - y_margin, global_max + y_margin)
+	
+	# Helper function to plot a single profile with consistent y-limits
+	function plot_single_profile(solutions, constants, index, ylims; shift_profiles = true)
+		# get needed constants
+		L = constants.L
+		z = constants.z
+		
+		# get coefficients for this solution
+		coeffs = solutions[index, 2:end]
+		
+		# convert to profile
+		profile = fourierSeries(coeffs, z, L)[1]
+		
+		# shift profile if requested
+		if shift_profiles
+			profile = [profile[Int(end/2)+1:end]; profile[1:Int(end/2)]]
+		end
+		
+		# create plot with consistent y-limits
+		p = plot(z, profile, 
+			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+			lw = 2, 
+			color = :steelblue,
+			legend = false,
+			ylims = ylims,
+			size = (400, 400))
+		xlabel!(L"z")
+		ylabel!(L"S")
+		
+		return p
+	end
+	
+	# Helper function to plot coefficients for a single solution
+	function plot_single_coeffs(solutions, index)
+		# get coefficients for this solution
+		coeffs = solutions[index, 2:end]
+		
+		# create plot
+		p = plot(abs.(coeffs), 
+			yaxis = :log, 
+			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+			marker = :circle,
+			markersize = 3,
+			markerstrokewidth = 0,
+			markerstrokealpha = 0,
+			legend = false,
+			size = (400, 400))
+		xlabel!("n")
+		ylabel!(L"a_n")
+		
+		return p
+	end
+	
+	# Create plots for all indices
+	profile_plots = []
+	coeff_plots = []
+	
+	for idx in indices
+		push!(profile_plots, plot_single_profile(solutions, constants, idx, ylims; shift_profiles = shift_profiles))
+		push!(coeff_plots, plot_single_coeffs(solutions, idx))
+	end
+	
+	# Strict two-column layout: profiles left, coefficients right
+	n_solutions = length(indices)
+	all_plots = []
+	for i in 1:n_solutions
+		push!(all_plots, profile_plots[i])
+		push!(all_plots, coeff_plots[i])
+	end
+
+	# Create final plot with no empty panes
+	p = plot(all_plots..., layout = (n_solutions, 2), size = figure_size)
+	
+	# Save figure if requested
+	if save_figure
+		savefig(p, filename)
+		println("Figure saved as: $filename")
+	end
+	
+	return p
+end
+
+
+function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol = :error, yscale::Symbol = :log10)
+
+	# Use the directory exactly as provided and gather all .jld2 files recursively
+	if !isdir(dirpath)
+		error("results directory not found: $(dirpath)")
+	end
+
+	files = String[]
+	for (root, _, fs) in walkdir(dirpath)
+		for f in fs
+			endswith(f, ".jld2") && push!(files, joinpath(root, f))
+		end
+	end
+
+	# Buckets per requested branch index: idx => vector of (N, y, a1)
+	data_by_index = Dict{Int, Vector{Tuple{Int, Float64, Float64}}}()
+	for idx in indices
+		data_by_index[idx] = Vector{Tuple{Int, Float64, Float64}}()
+	end
+
+	# Iterate over result files
+	for file_path in files
+		try
+			solutions, constants, metadata = readSolution(file_path)
+
+			branch_len = size(solutions, 1)
+			for idx in indices
+				if idx <= branch_len
+					N = Int(constants.N)
+					a1 = solutions[idx, 3]
+					if metric == :error
+						y = Float64(metadata["errors"][idx])
+					elseif metric == :condition
+						y = Float64(metadata["condition_numbers"][idx])
+					else
+						error("unknown metric: $(metric). use :error or :condition")
+					end
+					# Skip non-positive values on log scale to avoid warnings and empty plots
+					if !(yscale == :log10 && y <= 0)
+						push!(data_by_index[idx], (N, y, a1))
+					end
+				end
+			end
+		catch
+			# skip unreadable/broken files silently to keep plotting robust
+		end
+	end
+
+	# Create plot
+	p = plot(legend = true, size = (700, 500))
+	for idx in indices
+		entries = data_by_index[idx]
+		isempty(entries) && continue
+		# sort by N
+		perm = sortperm(entries; by = x -> x[1])
+		sorted = entries[perm]
+		xN = [t[1] for t in sorted]
+		yvals = [t[2] for t in sorted]
+		# use amplitude from largest N as label
+		label_a1 = sorted[end][3]
+		label = "a₁ ≈ $(round(label_a1, digits=3))"
+		plot!(xN, yvals, lw = 2, marker = :circle, markersize = 3, label = label)
+	end
+
+	# axes
+	xlabel!("N")
+	if metric == :error
+		ylabel!("Error")
+	elseif metric == :condition
+		ylabel!("Condition number")
+	end
+
+	if yscale == :log10
+		plot!(yaxis = :log10)
+	end
 
 	return p
 end

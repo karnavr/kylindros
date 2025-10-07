@@ -1,6 +1,8 @@
 "Solves for a bifurcation branch of solutions."
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false)
+using LinearAlgebra
+
+function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_subdir::String = "", verbose = true)
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
@@ -14,12 +16,13 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 
 
 	# check if the solution branch already exists
-	existing_filename = solutionExists(constants, branchN, tol)
+	existing_filename = solutionExists(constants, branchN, tol; subdir = save_subdir)
 
 	# if the solution branch already exists, return the existing solution or delete it based on overwrite flag
 	if existing_filename != false
 		model_name = getModelName(constants)
-		full_existing_filename = "results/$(model_name)/$(existing_filename)"
+		dir = joinpath(results_dir(save_subdir), model_name)
+		full_existing_filename = joinpath(dir, string(existing_filename))
 		
 		if !overwrite
 			println("Solution branch already exists.")
@@ -38,8 +41,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	# initialize convergence array
 	iterations = zeros(branchN)
 
-	# initialize flags array
+	# initialize flags array (for each branch point)
 	flags = randn(branchN)
+
+	# condition numbers per branch point (only filled for :NLSolver for now)
+	condition_numbers = zeros(branchN)
 
 	# start timer
 	start_time = time()
@@ -63,6 +69,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 			iterations[i] = sol.stats.nsteps
 			# flags[i] = sol.stats.status
 
+			# compute Jacobian condition number at converged solution
+			funcJ(u) = equations(u, constants, a1Vals[i], 1.0)
+			J = finite_diff_jacobian(funcJ, sol.u)
+			condition_numbers[i] = cond(J)
+
 		else
 
 			# define the set of equations/function to solve: f(x) = 0
@@ -73,15 +84,15 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 			
 		end
 
-		# update intial guess 
+		# update intial guess with current solution
 		initial_guess[i+1,:] = solutions[i,:]
 
         # print progress for every 10% of branch points 
-        if i % Int(round(0.1*branchN)) == 0
-            println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
+        if i % Int(round(0.1*branchN)) == 0 && verbose
+                println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
         end
 
-		# check the average values of the last 20% of coefficients every 5% of branch points
+		# check the average values of the last 20% of coefficients every 5% of branch points (TODO: maybe there is a more precise way to do this)
 		# and if it's above 1e-15, zero the last 20% of coefficients
 		if i % max(1, Int(round(0.02*branchN))) == 0 # max() to ensure it's always greater than 1
 			if mean(abs.(initial_guess[i, end - Int(round(0.2*length(initial_guess[1,:]))):end])) > 1e-15
@@ -94,9 +105,8 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	# end timer and compute time 
 	computation_time = time() - start_time
 
-	# compute error for each branch point
+	# compute error (L2 norm) for each branch point
 	errors = zeros(branchN)
-
 	Threads.@threads for i = 1:branchN
 		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], 1.0))
 	end
@@ -116,13 +126,20 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		"iterations" => iterations,
 		"errors" => errors,
 		"flags" => flags,
+		"condition_numbers" => condition_numbers,
 	)
 
-	filename = generateFileName(metadata)
+	# build filename and destination directory
+	filename = string(generateFileName(metadata), "_N", constants.N)
+	model_name = metadata["model"]
+	dir = joinpath(results_dir(save_subdir), model_name)
+	mkpath(dir)
 
 	# Save the components directly at the top level
-	@save "../results/$(metadata["model"])/$(filename).jld2" solutions constants metadata
-	println("Saved solution branch to $(filename).jld2")
+	@save joinpath(dir, string(filename, ".jld2")) solutions constants metadata
+	if verbose
+		println("Saved solution branch to $(filename).jld2")
+	end
 
 	return solutions, constants, metadata
 

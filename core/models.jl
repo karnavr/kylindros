@@ -103,13 +103,15 @@ function c0(k, constants::fuConstants)
 end
 
 function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
+    λ1 = constants.λ1
+    λ2 = constants.λ2
+    vf = constants.vf
+    
+    # Add a small epsilon to prevent division by zero
+    denominator = max.(λ1 .+ S .- 1, 1e-10)
+    w = (λ2^2)/2 .* (1 .- (((λ1^4) ./ (denominator.^4))) .* (c - vf/λ2)^2)
 
-	λ2 = constants.λ2
-	vf = constants.vf
-
-	w = (λ2^2)/2 .* (1 .- (((λ1^4) ./ ((λ1 .+ S .- 1).^4))) .* (c - vf/λ2)^2)
-
-	return w
+    return w
 end
 
 ## FU & IL'ICHEV (λ1 = 1)
@@ -177,8 +179,9 @@ function unpackConstants(constants)
 
 	T = typeof(constants)
     @Threads.threads for field in fieldnames(T)
-        # Create and evaluate an expression that defines a variable with the field name
-        eval(:($(Symbol(field)) = getfield(constants, $(QuoteNode(field)))))
+        # Evaluate an assignment for each field with the concrete value to avoid referencing `constants` globally
+        local value = getfield(constants, field)
+        eval(:($(Symbol(field)) = $value))
     end
 
 	return nothing
