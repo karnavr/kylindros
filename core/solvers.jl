@@ -2,7 +2,7 @@
 
 ## WRAPPER FUNCTION
 
-function mySolver(f, initial_guess; solver = :myNewtonRaphson, tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function mySolver(f, initial_guess::AbstractVector{T}; solver = :myNewtonRaphson, tol::T = T(1e-8), max_iter::Int64 = 1000) where {T}
 
 	## Solves the system of equations f(x) = 0 using the specified solver (wrapper function)
 
@@ -28,7 +28,7 @@ end
 
 ## NUMERICAL SOLVERS
 
-function myNewton(f, x; tol::Float64 = 1e-8, max_iter::Int64 = 1000)
+function myNewton(f, x::AbstractVector{T}; tol::T = T(1e-8), max_iter::Int64 = 1000) where {T}
 
 	for i in 1:max_iter
 		J = finite_diff_jacobian(f, x)
@@ -143,13 +143,13 @@ end
 
 ## AUXILIARY FUNCTIONS
 
-function finite_diff_jacobian(f, x)
+function finite_diff_jacobian(f, x::AbstractVector{T}) where {T}
 
 	## Computes the Jacobian of the function f at the point x using finite differences
 
-    h = 1e-8  # Small perturbation (typically sqrt(machine epsilon))
+    h = T(1e-8)  # Small perturbation (typically sqrt(machine epsilon))
     n = length(x)
-    J = zeros(n, n)
+    J = zeros(T, n, n)
     fx = f(x)
 
     Threads.@threads for i in 1:n

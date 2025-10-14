@@ -2,21 +2,12 @@
 
 using LinearAlgebra
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_subdir::String = "", verbose = true)
+function bifurcation(initial_guess::AbstractMatrix{T}, a1Vals::AbstractVector{T}, branchN::Int64, constants::Constants; tol::T = T(1e-12), solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_subdir::String = "", verbose = true) where {T}
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
 
-	# check type of the a1Vals argument 
-	if typeof(a1Vals) != Vector{Float64}
-
-		# create a vector of length branchN starting from 0.001 with stepsize a1Vals
-		a1Vals = collect(range(0.001, step = a1Vals, length = branchN + 1))
-
-	end
-
-
 	# check if the solution branch already exists
-	existing_filename = solutionExists(constants, branchN, tol; subdir = save_subdir)
+	existing_filename = solutionExists(constants, branchN, float(tol); subdir = save_subdir)
 
 	# if the solution branch already exists, return the existing solution or delete it based on overwrite flag
 	if existing_filename != false
@@ -36,16 +27,16 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	end
 	
 	# initialize solution array
-	solutions = zeros(branchN, constants.N+2)
+	solutions = zeros(T, branchN, constants.N+2)
 
 	# initialize convergence array
-	iterations = zeros(branchN)
+	iterations = zeros(Int, branchN)
 
 	# initialize flags array (for each branch point)
-	flags = randn(branchN)
+	flags = zeros(Int, branchN)
 
 	# condition numbers per branch point (only filled for :NLSolver for now)
-	condition_numbers = zeros(branchN)
+	condition_numbers = zeros(Float64, branchN)
 
 	# start timer
 	start_time = time()
@@ -56,7 +47,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		if solver == :NLSolver
 
 			# define the set of equations/function to solve: f(x) = 0
-			f(u, p) = equations(u, constants, a1Vals[i], 1.0)
+			f(u, p) = equations(u, constants, a1Vals[i], T(1))
 
 			# define the problem
 			problem = NonlinearProblem(f, initial_guess[i,:])
@@ -70,14 +61,14 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 			# flags[i] = sol.stats.status
 
 			# compute Jacobian condition number at converged solution
-			funcJ(u) = equations(u, constants, a1Vals[i], 1.0)
+			funcJ(u) = equations(u, constants, a1Vals[i], T(1))
 			J = finite_diff_jacobian(funcJ, sol.u)
 			condition_numbers[i] = cond(J)
 
 		else
 
 			# define the set of equations/function to solve: f(x) = 0
-			func(u) = equations(u, constants::Constants, a1Vals[i], 1.0)
+			func(u) = equations(u, constants, a1Vals[i], T(1))
 
 			# solve for the current branch point + capture
 			solutions[i,:], iterations[i], flags[i] = mySolver(func, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
@@ -88,7 +79,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		initial_guess[i+1,:] = solutions[i,:]
 
         # print progress for every 10% of branch points 
-        if i % Int(round(0.1*branchN)) == 0 && verbose
+        if i % Int(round(0.01*branchN)) == 0 && verbose
                 println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
         end
 
@@ -96,7 +87,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		# and if it's above 1e-15, zero the last 20% of coefficients
 		if i % max(1, Int(round(0.02*branchN))) == 0 # max() to ensure it's always greater than 1
 			if mean(abs.(initial_guess[i, end - Int(round(0.2*length(initial_guess[1,:]))):end])) > 1e-15
-				initial_guess[i+1, end - Int(round(0.2*length(initial_guess[1,:]))):end] .= 0
+				initial_guess[i+1, end - Int(round(0.2*length(initial_guess[1,:]))):end] .= T(0)
 			end
 		end
 
@@ -106,9 +97,9 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	computation_time = time() - start_time
 
 	# compute error (L2 norm) for each branch point
-	errors = zeros(branchN)
+	errors = zeros(T, branchN)
 	Threads.@threads for i = 1:branchN
-		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], 1.0))
+		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], T(1)))
 	end
 
 
@@ -120,11 +111,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		"computation_time" => computation_time,
 		"solver" => solver,
 		"max_iter" => max_iter,
-		"tol" => tol,
+		"tol" => float(tol),
 		"branchN" => branchN,
-		"a1Vals" => a1Vals,
+		"a1Vals" => float.(a1Vals),
 		"iterations" => iterations,
-		"errors" => errors,
+		"errors" => float.(errors),
 		"flags" => flags,
 		"condition_numbers" => condition_numbers,
 	)

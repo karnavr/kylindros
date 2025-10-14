@@ -116,30 +116,28 @@ end
 
 ## FU & IL'ICHEV (λ1 = 1)
 
-struct fuSimpleConstants <: Constants
+struct fuSimpleConstants{T} <: Constants
 	N::Int64  					# number of modes for solution S(z)
-	L::Real                   	# half-domain length
+	L::T                   		# half-domain length
 	
 	# domain definition
-	dz::Float64 				# domain spacing
-    z::Vector{Float64} 			# domain vector of values (2N + 2 points)
+	dz::T 						# domain spacing
+    z::Vector{T} 				# domain vector of values (2N + 2 points)
 
 	# physical geometry constants 
-	b::Float64 					# inner rod radius
-	λ2::Float64					# principal stretches
+	b::T 						# inner rod radius
+	λ2::T						# principal stretches
 
-	vf::Float64					# fluid velocity 
-	
-	
-	function fuSimpleConstants(N::Int64, L::Real, b::Float64, λ2::Float64, vf::Float64)
-        dz = 2*L / (2*N+1)
-        z = collect(-Float64(L):dz:Float64(L))
-
-        new(N, L, dz, z, b, λ2, vf)
-    end
+	vf::T						# fluid velocity 
 end
 
-function c0(k, constants::fuSimpleConstants)
+function fuSimpleConstants(::Type{T}, N::Int64, L, b, λ2, vf) where {T}
+    dz = T(2) * T(L) / T(2*N + 1)
+    z  = collect(range(-T(L), step = dz, length = 2*N + 2))
+    return fuSimpleConstants{T}(N, T(L), dz, z, T(b), T(λ2), T(vf))
+end
+
+function c0(k, constants::fuSimpleConstants{T}) where {T}
 	## linearized wave speed for small amplitude waves c(k)
 
 	b = constants.b
@@ -150,22 +148,22 @@ function c0(k, constants::fuSimpleConstants)
 	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
 
 	# quadratic coeffs (Ac^2 + Bc + D) 
-	A = k*β1 - 2*λ2^2 * β0 + β0
-	B = 4 * vf * λ2 * β0
-	D = -2 * vf^2 * β0
+	A = k*β1 - T(2)*λ2^2 * β0 + β0
+	B = T(4) * vf * λ2 * β0
+	D = -T(2) * vf^2 * β0
 
 	# solve quadratic equation 
-	c0 = solve_quadratic(A, B, D)
+	c0_result = solve_quadratic(A, B, D)
 
-	return real.(c0)
+	return real.(c0_result)
 end
 
-function wall_model(constants::fuSimpleConstants, c, S)
+function wall_model(constants::fuSimpleConstants{T}, c, S) where {T}
 
 	λ2 = constants.λ2
 	vf = constants.vf
 
-	w = (λ2^2)/2 .* (1 .- (1 ./ (S.^4))) .* (c - vf/λ2)^2
+	w = (λ2^2)/T(2) .* (T(1) .- (T(1) ./ (S.^4))) .* (c - vf/λ2)^2
 
 	return w
 end

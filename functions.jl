@@ -1,3 +1,4 @@
+using ArbNumerics
 using Plots, LaTeXStrings
 using Plots.PlotMeasures
 

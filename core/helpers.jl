@@ -8,18 +8,16 @@ function β(n, k, b, S0)
 	return real.(beta1 .+ beta2)
 end
 
-function fourierSeries(coefficients, domain::Vector, L::Real)
+function fourierSeries(coefficients::AbstractVector{T}, domain::AbstractVector, L) where {T}
 	
     N = length(coefficients) - 1
 	n_domain = Int(length(domain))
 	
-    # Use the element type of coefficients for the output arrays
-    T = eltype(coefficients)
     S = zeros(T, n_domain)  	# profile S
     Sz = zeros(T, n_domain)  	# first derivative Sz	
     Szz = zeros(T, n_domain)  	# second derivative Szz
 
-	k_values = [(n*π/L) for n in 1:N]
+	k_values = [T(n * π / L) for n in 1:N]
 	
 	# Add constant offset to S
 	S .= coefficients[1] 
@@ -77,22 +75,22 @@ function recompute_solutions(file_path::String)
 
 end
 
-function solve_quadratic(a::AbstractArray, b::AbstractArray, c::AbstractArray)
-    Δ = b.^2 - 4 .* a .* c
-    if any(Δ .< 0)
+function solve_quadratic(a::T, b::T, c::T) where {T<:Number}
+    Δ = b^2 - T(4)*a*c
+    if Δ < 0
 		print("Solution (c0?) is complex!")
-        return Complex.((-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a))  # Return complex roots
+        return Complex((-b + sqrt(Complex(Δ))) / (T(2)*a))
     else
-        return (-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a)  # Return real roots
+        return (-b + sqrt(Δ)) / (T(2)*a)
     end
 end
 
-function solve_quadratic(a::Number, b::Number, c::Number)
-    Δ = b^2 - 4*a*c
-    if Δ < 0
+function solve_quadratic(a::AbstractArray{T}, b::AbstractArray{T}, c::AbstractArray{T}) where {T}
+    Δ = b.^2 - T(4) .* a .* c
+    if any(Δ .< 0)
 		print("Solution (c0?) is complex!")
-        return Complex.((-b + sqrt(Δ)) / (2*a))  # Return complex roots
+        return Complex.((-b .+ sqrt.(Complex.(Δ))) ./ (T(2) .* a))
     else
-        return (-b + sqrt(Δ)) / (2*a)  # Return real roots
+        return (-b .+ sqrt.(Complex.(Δ))) ./ (T(2) .* a)
     end
 end

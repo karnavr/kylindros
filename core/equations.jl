@@ -1,6 +1,6 @@
 "General equations for the cylindrical AFM formulation with an arbitrary wall model."
 
-function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
+function equations(unknowns::AbstractVector{T}, constants::Constants, a₁::T, a₀::T) where {T}
 
 	# Returns the N + 2 equations that we want to solve for:
 
@@ -8,38 +8,37 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	unpackConstants(constants)
 
 	c = unknowns[1]
-	coeffs = unknowns[2:N+2] # N + 1 coeffscla
+	coeffs = unknowns[2:N+2] # N + 1 coeffs
 
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
 	S, Sz, Szz = fourierSeries(coeffs, z, L)
 
-	# Use the element type of unknowns for the output arrays
-	T = eltype(unknowns)
+	# Typed arrays
 	integrands = zeros(T, N, length(z))
 	integrals = zeros(T, N)
 	eqs = zeros(T, N+2)            
 
 	# define common factor in equations 
-	Szsq = 1 .+ (Sz.^2);
+	Szsq = T(1) .+ (Sz.^2)
 
 	# define wall model
 	if constants isa ferrofluidConstants
 		one_p = (Szsq).*((c.^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
 	else 
 		w = wall_model(constants, c, S)
-		one_p = Szsq .* (c^2 .- 2 .* w)
+		one_p = Szsq .* (c^2 .- T(2) .* w)
 	end
 	
 
 	Threads.@threads for n = 1:N
 
-		k = n*π/L 
+		k = T(n) * T(π) / T(L)
 		
 	    one = k .* S .* sqrt.(Complex.(one_p))
-	    # two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
-		two = β_scaled(k, S, b)
+	    two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
+		# two = β_scaled(k, S, b)
 
 	    integrands[n, :] = real.(one .* two)
 		
@@ -81,6 +80,24 @@ function β_scaled(k, S, b)
 
     return real.(β)
 end
+
+# function β_scaled(k, S, b)
+#     kb = k*b
+#     kS = k .* S
+
+#     L₁ = zeros(ComplexF64, length(S))
+#     L₂ = zeros(ComplexF64, length(S))
+
+#     L₁ .= kS .- kb .+ log.(SpecialFunctions.besselkx.(1, Complex(kb))) .+ log.(SpecialFunctions.besselix.(1, Complex.(kS)))
+#     L₂ .= kb .- kS .+ log.(SpecialFunctions.besselix.(1, Complex(kb))) .+ log.(SpecialFunctions.besselkx.(1, Complex.(kS)))
+
+#     M = max.(real.(L₁), real.(L₂))
+
+#     β = zeros(ComplexF64, length(S))
+#     β .= exp.(M) .* (exp.(L₁ .- M) .- exp.(L₂ .- M))
+
+#     return real.(β)
+# end
 
 # function β_scaled(k, S, b)
     

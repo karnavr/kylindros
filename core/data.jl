@@ -47,11 +47,15 @@ function getCurrentDateToString()
     return date_string
 end
 
-function solutionExists(constants::Constants, branchN::Int64, tol::Float64; subdir::String = "") 
+function solutionExists(constants::Constants, branchN::Int64, tol::Real; subdir::String = "") 
 
     "Loops through all the files in the results directory and checks if a solution exists for the given constants. 
     
     If it does, it returns the filename. If it doesn't, it returns false."
+
+    # TEMPORARY: disable existence check to avoid JLD2 reconstruction warnings while migrating types.
+    # TODO: Re-enable this check once old result files are regenerated with parametric constants.
+    return false
 
     # get the model name and target directory
     model_name = getModelName(constants)
@@ -77,7 +81,7 @@ function solutionExists(constants::Constants, branchN::Int64, tol::Float64; subd
                 if compareConstants(constants, saved_results["constants"])
 
                     # check if the tolerance and branchN are the same
-                    if saved_results["metadata"]["tol"] == tol && 
+                    if Float64(saved_results["metadata"]["tol"]) == Float64(tol) && 
                        saved_results["metadata"]["branchN"] == branchN
                         return file
                     end
@@ -92,7 +96,7 @@ function solutionExists(constants::Constants, branchN::Int64, tol::Float64; subd
     return false
 end
 
-function compareConstants(constants1::Constants, constants2::Constants)
+function compareConstants(constants1::Constants, constants2)
 
     "Compares two constants structs for all fields except for dz and the z vector and returns true if they are equal, false otherwise."
 
@@ -102,7 +106,9 @@ function compareConstants(constants1::Constants, constants2::Constants)
     # loop through all the fieldnames
     for field in all_fieldnames
         if field != :dz && field != :z
-            if getfield(constants1, field) != getfield(constants2, field)
+            v1 = getfield(constants1, field)
+            v2 = hasproperty(constants2, field) ? getproperty(constants2, field) : getfield(constants2, field)
+            if v1 != v2
                 return false
             end
         end

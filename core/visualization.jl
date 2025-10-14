@@ -34,9 +34,9 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true)
 
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
-	for (i, index) in enumerate(indices)
-		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i], color = :steelblue)
-	end
+    for (i, index) in enumerate(indices)
+        plot!(z, profiles[index,:], label = "a₁ = $(round(Float64(solutions[index,3]); digits=3))", lw=2, linestyle = linestyles[i], color = :steelblue)
+    end
 	xlabel!(L"z"); ylabel!(L"S")
 
 	return p
@@ -79,9 +79,9 @@ function plot_coeffs(solutions, indices = round.(Int, range(1, size(solutions,1)
 	# plot the coefficients
 	p = plot(legend=false, size = (500,500))
 	for index in indices
-		plot!(abs.(coeffs[Int(index),:]), 
+        plot!(abs.(coeffs[Int(index),:]), 
 			yaxis=:log, 
-			label = "a₁ = $(round(solutions[Int(index),3], digits=3))", 
+            label = "a₁ = $(round(Float64(solutions[Int(index),3]); digits=3))", 
 			marker = :circle,
 			markersize = 3,
 			markerstrokewidth = 0,
@@ -200,8 +200,8 @@ function plot_comparison_wrapper(solutions, constants::Constants;
 		end
 		
 		# create plot with consistent y-limits
-		p = plot(z, profile, 
-			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+        p = plot(z, profile, 
+            label = "a₁ = $(round(Float64(solutions[index,3]); digits=3))", 
 			lw = 2, 
 			color = :steelblue,
 			legend = false,
@@ -219,9 +219,9 @@ function plot_comparison_wrapper(solutions, constants::Constants;
 		coeffs = solutions[index, 2:end]
 		
 		# create plot
-		p = plot(abs.(coeffs), 
+        p = plot(abs.(coeffs), 
 			yaxis = :log, 
-			label = "a₁ = $(round(solutions[index,3], digits=3))", 
+            label = "a₁ = $(round(Float64(solutions[index,3]); digits=3))", 
 			marker = :circle,
 			markersize = 3,
 			markerstrokewidth = 0,
@@ -324,7 +324,7 @@ function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol 
 		yvals = [t[2] for t in sorted]
 		# use amplitude from largest N as label
 		label_a1 = sorted[end][3]
-		label = "a₁ ≈ $(round(label_a1, digits=3))"
+        label = "a₁ ≈ $(round(Float64(label_a1); digits=3))"
 		plot!(xN, yvals, lw = 2, marker = :circle, markersize = 3, label = label)
 	end
 
