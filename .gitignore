@@ -29,3 +29,8 @@ Manifest.toml
 # results and papers folders
 results/
 papers/
+
+# Ignore all PDF and PNG files everywhere in the repository
+*.pdf
+*.png
+*.gz

@@ -2,7 +2,7 @@
 
 ## Functions for each type of plot
 
-function plot_profiles(solutions, constants::Constants; shift_profiles = true)
+function plot_profiles(solutions, constants::Constants; shift_profiles = true, line_color = theme_palette(:default)[1])
 
 	## plot three profiles from the solutions branch (equally spaced in the last 0.75 of the branch)
 
@@ -14,8 +14,18 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true)
 	# seperate coeffs and speeds
 	coeffs = solutions[:,2:end]
 
-	# pick three equally spaced indices from the last 0.75 of the branch
-	indices = [Int(round(0.5*branchN)), Int(round(0.75*branchN)), branchN]
+	# pick three profiles with equally spaced a₁ amplitudes from the last 0.75 of the branch
+	start_idx = Int(round(0.25*branchN))
+	a1_vals = solutions[start_idx:end, 3]  # a₁ values from last 75%
+	indices_range = start_idx:branchN
+	
+	# target three evenly spaced a₁ values
+	a1_min = minimum(a1_vals)
+	a1_max = maximum(a1_vals)
+	target_a1 = range(a1_min, a1_max, length=3)
+	
+	# find closest actual solution for each target a₁
+	indices = [indices_range[argmin(abs.(a1_vals .- target))] for target in target_a1]
 
 	# create array for profiles
 	profiles = zeros(branchN,length(z))
@@ -35,34 +45,127 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true)
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
 	for (i, index) in enumerate(indices)
-		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i], color = :steelblue)
+		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i], color = line_color)
 	end
 	xlabel!(L"z"); ylabel!(L"S")
 
 	return p
 end
 
-function plot_branch(solutions, metadata)
+function repeat_profiles(solutions, constants::Constants; indices = [size(solutions,1)], n_periods::Int = 3, figure_size = nothing)
+
+	## plot up to three profiles (by branch indices) repeated n_periods times with shared y-axis scale
+
+	# get needed constants
+	L = constants.L
+	z = constants.z
+
+	# input validation
+	if n_periods < 1
+		error("n_periods must be ≥ 1")
+	end
+	if length(indices) < 1 || length(indices) > 3
+		error("provide 1 to 3 indices")
+	end
+	branchN = size(solutions, 1)
+	for idx in indices
+		if idx < 1 || idx > branchN
+			error("index $idx is out of bounds (1:$branchN)")
+		end
+	end
+
+	# helper to build a repeated profile and extended domain without duplicate junctions
+	function build_tiled_profile(coeffs, z, L, n_periods)
+		profile = fourierSeries(coeffs, z, L)[1]
+		period = z[end] - z[1]
+		z_ext = Vector{eltype(z)}()
+		prof_ext = Vector{eltype(profile)}()
+		for i = 0:(n_periods-1)
+			if i == 0
+				append!(z_ext, z)
+				append!(prof_ext, profile)
+			else
+				append!(z_ext, (z[2:end] .+ i * period))
+				append!(prof_ext, profile[2:end])
+			end
+		end
+		return z_ext, prof_ext
+	end
+
+	# build tiled series for requested indices
+	z_series = Vector{Vector{eltype(z)}}()
+	prof_series = Vector{Vector{Float64}}()
+	for idx in indices
+		coeffs = solutions[idx, 2:end]
+		z_ext, prof_ext = build_tiled_profile(coeffs, z, L, n_periods)
+		push!(z_series, z_ext)
+		push!(prof_series, prof_ext)
+	end
+
+	# compute shared y-limits
+	global_min = minimum(minimum.(prof_series))
+	global_max = maximum(maximum.(prof_series))
+	y_margin = 0.05 * (global_max - global_min)
+	if y_margin == 0
+		y_margin = 0.01
+	end
+	ylims_shared = (global_min - y_margin, global_max + y_margin)
+
+	# assemble subplots in a single row
+	subplots = []
+	for i in 1:length(indices)
+		p_i = plot(z_series[i], prof_series[i],
+			lw = 2,
+			color = :steelblue,
+			legend = false,
+			ylims = ylims_shared)
+		xlabel!(L"z")
+		ylabel!(L"S")
+		push!(subplots, p_i)
+	end
+
+	# stack subplots top-to-bottom and either use provided size or auto-scale height
+	if figure_size === nothing
+		fig_width = 1000
+		fig_height = 300 * length(subplots)
+		p = plot(subplots..., layout = (length(subplots), 1), size = (fig_width, fig_height))
+	else
+		p = plot(subplots..., layout = (length(subplots), 1), size = figure_size)
+	end
+	return p
+end
+
+# Backward-compatible method: single index positional argument
+function repeat_profiles(solutions, constants::Constants, index::Int; n_periods::Int = 3, figure_size = nothing)
+	return repeat_profiles(solutions, constants; indices = [index], n_periods = n_periods, figure_size = figure_size)
+end
+
+function plot_branch(solutions, metadata; color_by_error = false)
 
 	## plot the branch of solutions
-
-	# get errors
-	errors = metadata["errors"]
 
 	# seperate coeffs and speeds
 	speeds = solutions[:,1]
 	a₁ = solutions[:,3]
 
-	# plot the branch with error-based coloring
-	p = scatter(speeds, a₁, 
-		marker_z = log10.(abs.(errors)),         # color by log10 of errors
-		color = :plasma,           # colormap choice
-		colorbar_title = "log₁₀(Error)",  # colorbar label
-		colorbar_titlefontsize = 6,
-		colorbar_tickfontsize = 6,
-		colorbar = false,
-		legend = false, 
-		size = (750,500))
+	# plot the branch
+	if color_by_error
+		errors = metadata["errors"]
+		p = scatter(speeds, a₁, 
+			marker_z = log10.(abs.(errors)),
+			color = :plasma,
+			colorbar_title = "log₁₀(Error)",
+			colorbar_titlefontsize = 6,
+			colorbar_tickfontsize = 6,
+			colorbar = false,
+			legend = false, 
+			size = (500,500))
+	else
+		p = scatter(speeds, a₁, 
+			legend = false, 
+			size = (500,500))
+	end
+	
 	xlabel!(L"c")
 	ylabel!(L"a_1")
 
@@ -264,7 +367,7 @@ function plot_comparison_wrapper(solutions, constants::Constants;
 end
 
 
-function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol = :error, yscale::Symbol = :log10)
+function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol = :error, yscale::Symbol = :log10, legend_position = :best)
 
 	# Use the directory exactly as provided and gather all .jld2 files recursively
 	if !isdir(dirpath)
@@ -313,7 +416,7 @@ function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol 
 	end
 
 	# Create plot
-	p = plot(legend = true, size = (700, 500))
+	p = plot(legend = legend_position, size = (500, 500))
 	for idx in indices
 		entries = data_by_index[idx]
 		isempty(entries) && continue
@@ -324,16 +427,16 @@ function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol 
 		yvals = [t[2] for t in sorted]
 		# use amplitude from largest N as label
 		label_a1 = sorted[end][3]
-		label = "a₁ ≈ $(round(label_a1, digits=3))"
+		label = "a₁ = $(round(label_a1, digits=3))"
 		plot!(xN, yvals, lw = 2, marker = :circle, markersize = 3, label = label)
 	end
 
 	# axes
-	xlabel!("N")
+	xlabel!(L"N")
 	if metric == :error
 		ylabel!("Error")
 	elseif metric == :condition
-		ylabel!("Condition number")
+		ylabel!(L"\sigma (J)")
 	end
 
 	if yscale == :log10

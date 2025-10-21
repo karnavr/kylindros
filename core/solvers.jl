@@ -152,7 +152,7 @@ function finite_diff_jacobian(f, x)
     J = zeros(n, n)
     fx = f(x)
 
-    Threads.@threads for i in 1:n
+    for i in 1:n
         x_perturbed = copy(x)
         x_perturbed[i] += h
         J[:, i] = (f(x_perturbed) - fx) / h

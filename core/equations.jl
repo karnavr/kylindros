@@ -3,12 +3,14 @@
 function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 
 	# Returns the N + 2 equations that we want to solve for:
+	# - N integrals 
+	# - 2 extra equations setting values of a0 and a1
 
 	# problem constants (unpack and assign to variables)
 	unpackConstants(constants)
 
 	c = unknowns[1]
-	coeffs = unknowns[2:N+2] # N + 1 coeffscla
+	coeffs = unknowns[2:N+2] # N + 1 coeffs
 
 	a0 = coeffs[1]
 	a1 = coeffs[2]
@@ -26,7 +28,7 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 
 	# define wall model
 	if constants isa ferrofluidConstants
-		one_p = (Szsq).*((c.^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
+		one_p = (Szsq).*((c^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
 	else 
 		w = wall_model(constants, c, S)
 		one_p = Szsq .* (c^2 .- 2 .* w)
@@ -48,6 +50,13 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	    integrals[n] = trapz(z, integrands[n, :] .* cos.(k .* z))
 
 	end
+
+	# Threads.@threads for n = 1:N
+	# 	k = n*π/L
+	# 	y = real.(k .* S .* sqrt.(Complex.(one_p)) .* β_scaled(k, S, b))
+	# 	y ./= maximum(abs.(y))
+	# 	integrals[n] = trapz(z, y .* cos.(k .* z))
+	# end
 
 	eqs[1:N] = real.(integrals)
 	eqs[N+1] = abs(a0 - a₀)

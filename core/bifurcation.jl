@@ -4,7 +4,7 @@ using LinearAlgebra
 
 function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_subdir::String = "", verbose = true)
 
-	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given intial guess"
+	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given initial guess, using a continuation scheme."
 
 	# check type of the a1Vals argument 
 	if typeof(a1Vals) != Vector{Float64}
@@ -38,11 +38,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	# initialize solution array
 	solutions = zeros(branchN, constants.N+2)
 
-	# initialize convergence array
+	# initialize number of iterations array
 	iterations = zeros(branchN)
 
 	# initialize flags array (for each branch point)
-	flags = randn(branchN)
+	flags = fill(NaN, branchN)
 
 	# condition numbers per branch point (only filled for :NLSolver for now)
 	condition_numbers = zeros(branchN)
@@ -77,7 +77,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		else
 
 			# define the set of equations/function to solve: f(x) = 0
-			func(u) = equations(u, constants::Constants, a1Vals[i], 1.0)
+			func(u) = equations(u, constants, a1Vals[i], 1.0)
 
 			# solve for the current branch point + capture
 			solutions[i,:], iterations[i], flags[i] = mySolver(func, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
@@ -107,7 +107,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 
 	# compute error (L2 norm) for each branch point
 	errors = zeros(branchN)
-	Threads.@threads for i = 1:branchN
+	for i = 1:branchN
 		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], 1.0))
 	end
 

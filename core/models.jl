@@ -178,7 +178,7 @@ function unpackConstants(constants)
 	## Unpacks constants and assigns to variables of the same name
 
 	T = typeof(constants)
-    @Threads.threads for field in fieldnames(T)
+    for field in fieldnames(T)
         # Evaluate an assignment for each field with the concrete value to avoid referencing `constants` globally
         local value = getfield(constants, field)
         eval(:($(Symbol(field)) = $value))
