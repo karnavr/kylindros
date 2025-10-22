@@ -2,7 +2,7 @@
 
 using LinearAlgebra
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_subdir::String = "", verbose = true)
+function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true)
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given initial guess, using a continuation scheme."
 
@@ -15,24 +15,11 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	end
 
 
-	# check if the solution branch already exists
-	existing_filename = solutionExists(constants, branchN, tol; subdir = save_subdir)
-
-	# if the solution branch already exists, return the existing solution or delete it based on overwrite flag
-	if existing_filename != false
-		model_name = getModelName(constants)
-		dir = joinpath(results_dir(save_subdir), model_name)
-		full_existing_filename = joinpath(dir, string(existing_filename))
-		
-		if !overwrite
-			println("Solution branch already exists.")
-			println("File: $(full_existing_filename)")
-			return load(full_existing_filename)["solutions"], load(full_existing_filename)["constants"], load(full_existing_filename)["metadata"]
-		else
-			println("Solution branch already exists, but overwrite flag is set.")
-			println("Deleting existing file: $(full_existing_filename)")
-			rm(full_existing_filename)
-		end
+	# check for existing solution and determine save directory
+	existing_result, dir, model_name = handleExistingSolution(constants, branchN, a1Vals, tol, solver, save_dir, overwrite)
+	
+	if !isnothing(existing_result)
+		return existing_result
 	end
 	
 	# initialize solution array
@@ -115,7 +102,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	## SAVING RESULTS
 
 	metadata = Dict(
-		"model" => getModelName(constants),
+		"model" => model_name,
 		"timestamp" => getCurrentDateToString(),
 		"computation_time" => computation_time,
 		"solver" => solver,
@@ -129,14 +116,12 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 		"condition_numbers" => condition_numbers,
 	)
 
-	# build filename and destination directory
-	filename = string(generateFileName(metadata), "_N", constants.N)
-	model_name = metadata["model"]
-	dir = joinpath(results_dir(save_subdir), model_name)
+	# build filename and create directory if needed
+	filename = generateFileName(metadata, constants)
 	mkpath(dir)
 
-	# Save the components directly at the top level
-	@save joinpath(dir, string(filename, ".jld2")) solutions constants metadata
+	# save the components directly at the top level
+	@save joinpath(dir, "$(filename).jld2") solutions constants metadata
 	if verbose
 		println("Saved solution branch to $(filename).jld2")
 	end
