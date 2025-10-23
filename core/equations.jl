@@ -35,28 +35,60 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	end
 	
 
-	Threads.@threads for n = 1:N
+	# Threads.@threads for n = 1:N
 
-		k = n*π/L 
+	# 	k = n*π/L 
 		
-	    one = k .* S .* sqrt.(Complex.(one_p))
-	    # two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
-		two = β_scaled(k, S, b)
+	#     one = k .* S .* sqrt.(Complex.(one_p))
+	#     # two = besselk.(1, Complex.(k * b)) .* besseli.(1, Complex.(k .* S)) .- besseli.(1, Complex.(k * b)) .* besselk.(1, Complex.(k .* S))
+	# 	two = β_scaled(k, S, b)
 
-	    integrands[n, :] = real.(one .* two)
+	#     integrands[n, :] = real.(one .* two)
 		
-	    # Normalize the integrand before integration to prevent numerical issues
-	    integrands[n, :] ./= maximum(abs.(integrands[n, :]))
-	    integrals[n] = trapz(z, integrands[n, :] .* cos.(k .* z))
+	#     # Normalize the integrand before integration to prevent numerical issues
+	#     integrands[n, :] ./= maximum(abs.(integrands[n, :]))
+	#     integrals[n] = trapz(z, integrands[n, :] .* cos.(k .* z))
 
+	# end
+
+	# Precompute wave numbers k_n = n*π/L to avoid recomputation in the loop
+	kvals = (π/L) .* collect(1:N)  # length N
+
+	# Precompute cos(k*z) for all n (saves per-iteration cos calls)
+	cos_kz_cache = Array{Float64}(undef, N, length(z))
+	for n in 1:N
+		cos_kz_cache[n, :] .= cos.(kvals[n] .* z)
 	end
 
-	# Threads.@threads for n = 1:N
-	# 	k = n*π/L
-	# 	y = real.(k .* S .* sqrt.(Complex.(one_p)) .* β_scaled(k, S, b))
-	# 	y ./= maximum(abs.(y))
-	# 	integrals[n] = trapz(z, y .* cos.(k .* z))
-	# end
+	# Precompute sqrt(Complex.(one_p)) once; reused across modes
+	sqrt_one_p = sqrt.(Complex.(one_p))
+
+	# Thread-local buffers for β(k, S, b) to avoid cross-thread writes
+	beta_bufs = [zeros(length(S)) for _ in 1:Threads.nthreads()]
+
+	# Thread-local buffers for row .* cos(k*z) product (to avoid a temporary each iteration)
+	prod_buffers = [zeros(T, length(z)) for _ in 1:Threads.nthreads()]
+
+	Threads.@threads for n = 1:N
+		k = kvals[n]
+		two = beta_bufs[Threads.threadid()]
+		β_scaled!(two, k, S, b)
+	
+		row = @view integrands[n, :]
+		# Fused in-place computation of the integrand row (no intermediates)
+		@. row = real(k * S * sqrt_one_p * two)
+	
+		# Normalize safely to improve conditioning without altering zeros
+		s = maximum(abs, row)
+		if isfinite(s) && s != 0
+			row ./= s
+		end
+	
+		cos_row = @view(cos_kz_cache[n, :])
+		prod = prod_buffers[Threads.threadid()]
+		prod .= row .* cos_row
+		integrals[n] = trapz(z, prod)
+	end
 
 	eqs[1:N] = real.(integrals)
 	eqs[N+1] = abs(a0 - a₀)
@@ -64,6 +96,26 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 
 	return eqs
 	
+end
+
+function β_scaled!(β, k, S, b)
+
+	kb = k*b
+	# Precompute pieces independent of i (scalar calls)
+	log_besselkx_kb = log(SpecialFunctions.besselkx(1, Complex(kb)))
+	log_besselix_kb = log(SpecialFunctions.besselix(1, Complex(kb)))
+
+	@inbounds for i in eachindex(S)
+		kSi = k*S[i]
+		log_besselix_kSi = log(SpecialFunctions.besselix(1, Complex(kSi)))
+		log_besselkx_kSi = log(SpecialFunctions.besselkx(1, Complex(kSi)))
+		L1 = kSi - kb + log_besselkx_kb + log_besselix_kSi
+		L2 = kb - kSi + log_besselix_kb + log_besselkx_kSi
+		M  = max(real(L1), real(L2))
+		β[i] = real(exp(M) * (exp(L1 - M) - exp(L2 - M)))
+	end
+
+	return β
 end
 
 function β_scaled(k, S, b)

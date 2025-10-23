@@ -39,7 +39,6 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	
 	for i = 1:branchN
 
-		
 		if solver == :NLSolver
 
 			# define the set of equations/function to solve: f(x) = 0
