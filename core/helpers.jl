@@ -13,22 +13,28 @@ function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L
     N = length(coefficients) - 1
 	n_domain = length(domain)
 	
-    S = zeros(Float64, n_domain)  	# profile S
-    Sz = zeros(Float64, n_domain)  	# first derivative Sz	
-    Szz = zeros(Float64, n_domain)  	# second derivative Szz
+    S = zeros(Float64, n_domain)
+    Sz = zeros(Float64, n_domain)
+    Szz = zeros(Float64, n_domain)
 
-	k_values = [(n*π/L) for n in 1:N]
-	
 	# Add constant offset to S
 	S .= coefficients[1] 
 	
+	# Pre-allocate buffer for cosine values to avoid recomputation
+	cos_kz = Vector{Float64}(undef, n_domain)
+	
+	π_over_L = π / Float64(L)  # Compute once and ensure Float64
+	
 	for n in 1:N
-		k = k_values[n]
+		k = n * π_over_L  # Compute inline, no array allocation
 		coeff = coefficients[n + 1]
-
-		@. S += coeff * cos(k * domain)
+		
+		# Compute trig values once, reuse for both S and Szz
+		@. cos_kz = cos(k * domain)
+		
+		@. S += coeff * cos_kz
 		@. Sz -= k * coeff * sin(k * domain)
-		@. Szz -= k^2 * coeff * cos(k * domain)
+		@. Szz -= (k^2) * coeff * cos_kz  # Reuse cos_kz
 	end
 		
     return S, Sz, Szz

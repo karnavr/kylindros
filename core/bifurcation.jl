@@ -14,7 +14,6 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	end
 
-
 	# check for existing solution and determine save directory
 	existing_result, dir, model_name = handleExistingSolution(constants, branchN, a1Vals, tol, solver, save_dir, overwrite)
 	
