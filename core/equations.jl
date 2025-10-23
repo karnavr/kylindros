@@ -1,34 +1,29 @@
 "General equations for the cylindrical AFM formulation with an arbitrary wall model."
 
-function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
+function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float64, a₀::Float64)::Vector{Float64}
 
 	# Returns the N + 2 equations that we want to solve for:
 	# - N integrals 
 	# - 2 extra equations setting values of a0 and a1
 
-	# problem constants (unpack and assign to variables)
-	unpackConstants(constants)
-
 	c = unknowns[1]
-	coeffs = unknowns[2:N+2] # N + 1 coeffs
+	coeffs = unknowns[2:constants.N+2] # N + 1 coeffs
 
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
-	S, Sz, Szz = fourierSeries(coeffs, z, L)
+	S, Sz, Szz = fourierSeries(coeffs, constants.z, constants.L)
 
-	# Use the element type of unknowns for the output arrays
-	T = eltype(unknowns)
-	integrands = zeros(T, N, length(z))
-	integrals = zeros(T, N)
-	eqs = zeros(T, N+2)            
+	integrands = zeros(Float64, constants.N, length(constants.z))
+	integrals = zeros(Float64, constants.N)
+	eqs = zeros(Float64, constants.N+2)            
 
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);
 
 	# define wall model
 	if constants isa ferrofluidConstants
-		one_p = (Szsq).*((c^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ B./(2 .* S.^2) .+ E);
+		one_p = (Szsq).*((c^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ constants.B./(2 .* S.^2) .+ constants.E);
 	else 
 		w = wall_model(constants, c, S)
 		one_p = Szsq .* (c^2 .- 2 .* w)
@@ -52,27 +47,27 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 	# end
 
 	# Precompute wave numbers k_n = n*π/L to avoid recomputation in the loop
-	kvals = (π/L) .* collect(1:N)  # length N
+	kvals = kvals = [(n*π/constants.L) for n in 1:constants.N]  # length N
 
 	# Precompute cos(k*z) for all n (saves per-iteration cos calls)
-	cos_kz_cache = Array{Float64}(undef, N, length(z))
-	for n in 1:N
-		cos_kz_cache[n, :] .= cos.(kvals[n] .* z)
+	cos_kz_cache = Array{Float64}(undef, constants.N, length(constants.z))
+	for n in 1:constants.N
+		cos_kz_cache[n, :] .= cos.(kvals[n] .* constants.z)
 	end
 
 	# Precompute sqrt(Complex.(one_p)) once; reused across modes
 	sqrt_one_p = sqrt.(Complex.(one_p))
 
 	# Thread-local buffers for β(k, S, b) to avoid cross-thread writes
-	beta_bufs = [zeros(length(S)) for _ in 1:Threads.nthreads()]
+	beta_bufs = [zeros(Float64, length(S)) for _ in 1:Threads.nthreads()]
 
 	# Thread-local buffers for row .* cos(k*z) product (to avoid a temporary each iteration)
-	prod_buffers = [zeros(T, length(z)) for _ in 1:Threads.nthreads()]
+	prod_buffers = [zeros(Float64, length(constants.z)) for _ in 1:Threads.nthreads()]
 
-	Threads.@threads for n = 1:N
+	Threads.@threads for n = 1:constants.N
 		k = kvals[n]
 		two = beta_bufs[Threads.threadid()]
-		β_scaled!(two, k, S, b)
+		β_scaled!(two, k, S, constants.b)
 	
 		row = @view integrands[n, :]
 		# Fused in-place computation of the integrand row (no intermediates)
@@ -87,18 +82,18 @@ function equations(unknowns, constants::Constants, a₁::Float64, a₀::Float64)
 		cos_row = @view(cos_kz_cache[n, :])
 		prod = prod_buffers[Threads.threadid()]
 		prod .= row .* cos_row
-		integrals[n] = trapz(z, prod)
+		integrals[n] = trapz(constants.z, prod)
 	end
 
-	eqs[1:N] = real.(integrals)
-	eqs[N+1] = abs(a0 - a₀)
-	eqs[N+2] = abs(a1 - a₁)
+	eqs[1:constants.N] = integrals
+	eqs[constants.N+1] = abs(a0 - a₀)
+	eqs[constants.N+2] = abs(a1 - a₁)
 
 	return eqs
 	
 end
 
-function β_scaled!(β, k, S, b)
+function β_scaled!(β::Vector{Float64}, k::Float64, S::Vector{Float64}, b::Float64)::Vector{Float64}
 
 	kb = k*b
 	# Precompute pieces independent of i (scalar calls)
@@ -118,21 +113,21 @@ function β_scaled!(β, k, S, b)
 	return β
 end
 
-function β_scaled(k, S, b)
+function β_scaled(k::Float64, S::Vector{Float64}, b::Float64)::Vector{Float64}
     
     kb = k*b
     kS = k.*S
 
     # preallocate L₁ and L₂
-    L₁ = zeros(length(S))
-    L₂ = zeros(length(S))
+    L₁ = zeros(Float64, length(S))
+    L₂ = zeros(Float64, length(S))
 
     # compute L₁ and L₂
     L₁ .= kS .- kb .+ log.(SpecialFunctions.besselkx.(1, Complex.(kb))) .+ log.(SpecialFunctions.besselix.(1, Complex.(kS)))
     L₂ .= kb .- kS .+ log.(SpecialFunctions.besselix.(1, Complex.(kb))) .+ log.(SpecialFunctions.besselkx.(1, Complex.(kS)))
 
     # preallocate β
-    β = zeros(length(S))
+    β = zeros(Float64, length(S))
 
     # compute max of L₁ and L₂ (ensure stabilization is applied for each element in domain)
     M = max.(L₁, L₂)

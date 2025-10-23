@@ -8,16 +8,14 @@ function β(n, k, b, S0)
 	return real.(beta1 .+ beta2)
 end
 
-function fourierSeries(coefficients, domain::Vector, L::Real)
+function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L::Real)::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
 	
     N = length(coefficients) - 1
-	n_domain = Int(length(domain))
+	n_domain = length(domain)
 	
-    # Use the element type of coefficients for the output arrays
-    T = eltype(coefficients)
-    S = zeros(T, n_domain)  	# profile S
-    Sz = zeros(T, n_domain)  	# first derivative Sz	
-    Szz = zeros(T, n_domain)  	# second derivative Szz
+    S = zeros(Float64, n_domain)  	# profile S
+    Sz = zeros(Float64, n_domain)  	# first derivative Sz	
+    Szz = zeros(Float64, n_domain)  	# second derivative Szz
 
 	k_values = [(n*π/L) for n in 1:N]
 	
@@ -77,20 +75,20 @@ function recompute_solutions(file_path::String)
 
 end
 
-function solve_quadratic(a::AbstractArray, b::AbstractArray, c::AbstractArray)
+function solve_quadratic(a::AbstractArray{Float64}, b::AbstractArray{Float64}, c::AbstractArray{Float64})
     Δ = b.^2 - 4 .* a .* c
     if any(Δ .< 0)
-		print("Solution (c0?) is complex!")
+	print("Solution (c0?) is complex!")
         return Complex.((-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a))  # Return complex roots
     else
         return (-b .+ sqrt.(Complex.(Δ))) ./ (2 .* a)  # Return real roots
     end
 end
 
-function solve_quadratic(a::Number, b::Number, c::Number)
+function solve_quadratic(a::Float64, b::Float64, c::Float64)
     Δ = b^2 - 4*a*c
     if Δ < 0
-		print("Solution (c0?) is complex!")
+	print("Solution (c0?) is complex!")
         return Complex.((-b + sqrt(Δ)) / (2*a))  # Return complex roots
     else
         return (-b + sqrt(Δ)) / (2*a)  # Return real roots

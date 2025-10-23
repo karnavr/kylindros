@@ -498,9 +498,6 @@ function plot_dispersion(k_range, constants::fuSimpleConstants; vary_param::Symb
 
 	"Plots the dispersion relation for the fu and il'ichev model with a varying parameter."
 
-	# unpack constants for the constants struct
-	unpackConstants(constants)
-
 	# initialize array for speeds
 	speeds = zeros(length(param_range), length(k_range))
 
@@ -508,11 +505,11 @@ function plot_dispersion(k_range, constants::fuSimpleConstants; vary_param::Symb
 
 		# create constants struct based on which parameter we are varying
 		if vary_param == :λ1
-			constants = fuSimpleConstants(N, L, b, param_value, vf)
+			constants = fuSimpleConstants(constants.N, constants.L, constants.b, param_value, constants.vf)
 		elseif vary_param == :λ2
-			constants = fuSimpleConstants(N, L, b, λ2, param_value)
+			constants = fuSimpleConstants(constants.N, constants.L, constants.b, constants.λ2, param_value)
 		elseif vary_param == :vf
-			constants = fuSimpleConstants(N, L, b, λ2, param_value)
+			constants = fuSimpleConstants(constants.N, constants.L, constants.b, constants.λ2, param_value)
 		end
 		
 		# compute speeds
@@ -540,9 +537,6 @@ function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :
 
 	"Plots the dispersion relation for the fu and il'ichev model with a varying parameter."
 
-	# unpack constants for the constants struct
-	unpackConstants(constants)
-
 	# initialize array for speeds
 	speeds = zeros(length(param_range), length(k_range))
 
@@ -550,13 +544,13 @@ function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :
 
 		# create constants struct based on which parameter we are varying
 		if vary_param == :λ1
-			constants = fuConstants(N, L, b, param_value, λ2, vf)
+			constants = fuConstants(constants.N, constants.L, constants.b, param_value, constants.λ2, constants.vf)
 		elseif vary_param == :λ2
-			constants = fuConstants(N, L, b, λ1, param_value, vf)
+			constants = fuConstants(constants.N, constants.L, constants.b, constants.λ1, param_value, constants.vf)
 		elseif vary_param == :vf
-			constants = fuConstants(N, L, b, λ1, λ2, param_value)
+			constants = fuConstants(constants.N, constants.L, constants.b, constants.λ1, constants.λ2, param_value)
 		elseif vary_param == :b
-			constants = fuConstants(N, L, param_value, λ1, λ2, vf)
+			constants = fuConstants(constants.N, constants.L, param_value, constants.λ1, constants.λ2, constants.vf)
 		end
 		
 		# compute speeds

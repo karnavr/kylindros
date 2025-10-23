@@ -169,21 +169,3 @@ function wall_model(constants::fuSimpleConstants, c, S)
 
 	return w
 end
-
-
-## UNPACK CONSTANTS (GENERAL)
-
-function unpackConstants(constants)
-
-	## Unpacks constants and assigns to variables of the same name
-
-	T = typeof(constants)
-    for field in fieldnames(T)
-        # Evaluate an assignment for each field with the concrete value to avoid referencing `constants` globally
-        local value = getfield(constants, field)
-        eval(:($(Symbol(field)) = $value))
-    end
-
-	return nothing
-
-end

@@ -2,7 +2,7 @@
 
 using LinearAlgebra
 
-function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true)
+function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true)::Tuple{Matrix{Float64}, Constants, Dict{String, Any}}
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given initial guess, using a continuation scheme."
 
@@ -23,16 +23,16 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	end
 	
 	# initialize solution array
-	solutions = zeros(branchN, constants.N+2)
+	solutions = zeros(Float64, branchN, constants.N+2)
 
 	# initialize number of iterations array
-	iterations = zeros(branchN)
+	iterations = zeros(Int64, branchN)
 
 	# initialize flags array (for each branch point)
 	flags = fill(NaN, branchN)
 
 	# condition numbers per branch point (only filled for :NLSolver for now)
-	condition_numbers = zeros(branchN)
+	condition_numbers = zeros(Float64, branchN)
 
 	# start timer
 	start_time = time()
@@ -92,7 +92,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 	computation_time = time() - start_time
 
 	# compute error (L2 norm) for each branch point
-	errors = zeros(branchN)
+	errors = zeros(Float64, branchN)
 	for i = 1:branchN
 		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], 1.0))
 	end
@@ -100,7 +100,7 @@ function bifurcation(initial_guess, a1Vals, branchN::Int64, constants::Constants
 
 	## SAVING RESULTS
 
-	metadata = Dict(
+	metadata = Dict{String, Any}(
 		"model" => model_name,
 		"timestamp" => getCurrentDateToString(),
 		"computation_time" => computation_time,
