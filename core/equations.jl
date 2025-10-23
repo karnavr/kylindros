@@ -59,12 +59,13 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	sqrt_one_p = sqrt.(Complex.(one_p))
 
 	# Thread-local buffers for β(k, S, b) to avoid cross-thread writes
-	beta_bufs = [zeros(Float64, length(S)) for _ in 1:Threads.nthreads()]
+	# Use maxthreadid() to account for all thread pools (default + interactive)
+	beta_bufs = [zeros(Float64, length(S)) for _ in 1:Threads.maxthreadid()]
 
 	# Thread-local buffers for row .* cos(k*z) product (to avoid a temporary each iteration)
-	prod_buffers = [zeros(Float64, length(constants.z)) for _ in 1:Threads.nthreads()]
+	prod_buffers = [zeros(Float64, length(constants.z)) for _ in 1:Threads.maxthreadid()]
 
-	Threads.@threads for n = 1:constants.N
+	Threads.@threads :static for n = 1:constants.N
 		k = kvals[n]
 		two = beta_bufs[Threads.threadid()]
 		β_scaled!(two, k, S, constants.b)
