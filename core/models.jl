@@ -65,17 +65,14 @@ struct fuConstants <: Constants
 
 	# physical geometry constants 
 	b::Float64 					# inner rod radius
-	λ1::Float64					# principal stretch 1
-	λ2::Float64					# principal stretch 2
-	
-	vf::Float64					# fluid velocity 
+	v::Float64					# fluid velocity 
 	
 	
-	function fuConstants(N::Int64, L::Real, b::Float64, λ1::Float64, λ2::Float64, vf::Float64)
+	function fuConstants(N::Int64, L::Real, b::Float64, v::Float64)
         dz = 2*L / (2*N+1)
         z = collect(-Float64(L):dz:Float64(L))
 
-        new(N, L, dz, z, b, λ1, λ2, vf)
+        new(N, L, dz, z, b, v)
     end
 end
 
@@ -83,38 +80,36 @@ function c0(k, constants::fuConstants)
 	## linearized wave speed for small amplitude waves c(k)
 
 	b = constants.b
-	λ1 = constants.λ1
-	λ2 = constants.λ2
-	vf = constants.vf
+	v = constants.v
 
 	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
 	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
 
-	# quadratic coeffs (Ac^2 + Bc + D) 
-	A = k*β1 - ((2*λ2^2 * β0) / λ1) + β0
-	B = (4 * vf * λ2 * β0) / λ1
-	D = -2 * vf^2 * β0 / λ1
+	alpha = (2*β0) / (β0 + k*β1)
 
-	# solve quadratic equation 
-	c0 = solve_quadratic(A, B, D)
+    c0 = v * (sqrt(alpha) / (1 + sqrt(alpha)))
 
 	return real.(c0)
 	
 end
 
-function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
-    λ1 = constants.λ1
-    λ2 = constants.λ2
-    vf = constants.vf
-    
-    # Add a small epsilon to prevent division by zero
-    denominator = max.(λ1 .+ S .- 1, 1e-10)
-    w = (λ2^2)/2 .* (1 .- (((λ1^4) ./ (denominator.^4))) .* (c - vf/λ2)^2)
+# function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
 
+#     v = constants.v
+    
+#     # Add a small epsilon to prevent division by zero
+#     @. w = (1/2) * (1 .- (1 ./ (S.^4))) .* (c .- v).^2
+
+#     return real.(w)
+# end
+
+function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
+    v = constants.v
+    w = 0.5 .* (1 .- (1 ./ (S .^ 4))) .* (c - v)^2
     return w
 end
 
-## FU & IL'ICHEV (λ1 = 1)
+## FU & IL'ICHEV (λ2 = 1)
 
 struct fuSimpleConstants <: Constants
 	N::Int64  					# number of modes for solution S(z)
