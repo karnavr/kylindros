@@ -43,7 +43,7 @@ function getCurrentDateToString()
     current_time = Dates.now()
 
     # format the date and time as a compact string (ddmmHHMM)
-    date_string = Dates.format(current_time, "ddmmHHMM")
+    date_string = Dates.format(current_time, "ddmmHHMMSS")
 
     return date_string
 end

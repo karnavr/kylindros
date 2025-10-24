@@ -575,6 +575,269 @@ function plot_dispersion(k_range, constants::fuConstants; vary_param::Symbol = :
 	return p
 end
 
+## PARAMETER VARIATION PLOTS
+
+function plotBranchVariations(dir_path::String; 
+                             constant_param::Symbol, 
+                             constant_value::Real,
+                             varied_param_range::Union{Nothing, Tuple{Real, Real}} = nothing)
+
+	"Plots multiple solution branches from a directory, using the closest available value for constant_param and automatically detecting which parameter varies. Optionally filters by varied_param_range = (min, max)."
+
+	# validate directory
+	if !isdir(dir_path)
+		error("directory not found: $(dir_path)")
+	end
+
+	# collect all .jld2 files recursively
+	files = String[]
+	for (root, _, fs) in walkdir(dir_path)
+		for f in fs
+			endswith(f, ".jld2") && push!(files, joinpath(root, f))
+		end
+	end
+
+	if isempty(files)
+		error("no .jld2 files found in $(dir_path)")
+	end
+
+	# load all files and extract parameter values
+	all_branches = Tuple{Matrix{Float64}, Constants}[]
+
+	for file_path in files
+		try
+			solutions, constants, metadata = readSolution(file_path)
+			push!(all_branches, (solutions, constants))
+		catch
+			# skip files that can't be read or don't have required fields
+			continue
+		end
+	end
+
+	if isempty(all_branches)
+		error("no valid result files found in $(dir_path)")
+	end
+
+	# find the closest value of constant_param to the user's requested value
+	param_values = [getfield(branch[2], constant_param) for branch in all_branches]
+	unique_values = sort(unique(param_values))
+	
+	# find closest value
+	closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
+	
+	# filter branches with this closest value
+	matching_branches = Tuple{Matrix{Float64}, Constants}[]
+	for (solutions, constants) in all_branches
+		if getfield(constants, constant_param) == closest_value
+			push!(matching_branches, (solutions, constants))
+		end
+	end
+
+	# print what value is actually constant
+	println("Plotting branches with $(constant_param) = $(closest_value)")
+
+	# detect which parameter varies across the matching files
+	# get all field names from the first constants struct (excluding z, dz)
+	first_constants = matching_branches[1][2]
+	param_names = filter(f -> f ∉ [:z, :dz, :N], fieldnames(typeof(first_constants)))
+	
+	# find parameters that vary
+	varying_params = Symbol[]
+	for param in param_names
+		param == constant_param && continue  # skip the constant parameter
+		
+		values = [getfield(branch[2], param) for branch in matching_branches]
+		unique_vals = unique(values)
+		
+		# if more than one unique value, this parameter varies
+		if length(unique_vals) > 1
+			push!(varying_params, param)
+		end
+	end
+
+	if isempty(varying_params)
+		@warn "no varying parameters detected - all branches have identical parameters"
+		varying_param = :none
+	elseif length(varying_params) == 1
+		varying_param = varying_params[1]
+	else
+		# multiple parameters vary - use the first one and warn
+		varying_param = varying_params[1]
+		@warn "multiple parameters vary: $(varying_params), plotting by $(varying_param)"
+	end
+
+	# organize branches by the varying parameter
+	branches_dict = Dict{Float64, Tuple{Matrix{Float64}, Constants}}()
+	
+	for (solutions, constants) in matching_branches
+		if varying_param == :none
+			# all branches identical, just plot them all
+			key_val = rand()  # random key since they're all the same
+		else
+			key_val = getfield(constants, varying_param)
+		end
+		branches_dict[key_val] = (solutions, constants)
+	end
+
+	# sort by varying parameter value for consistent plotting
+	sorted_values = sort(collect(keys(branches_dict)))
+
+	# filter by varied_param_range if specified
+	if !isnothing(varied_param_range) && varying_param != :none
+		min_val, max_val = varied_param_range
+		sorted_values = filter(v -> min_val <= v <= max_val, sorted_values)
+		
+		if isempty(sorted_values)
+			error("no branches found within varied_param_range = $(varied_param_range)")
+		end
+		
+		println("Filtered to $(length(sorted_values)) branches with $(varying_param) ∈ [$(min_val), $(max_val)]")
+	end
+
+	# create plot
+	p = plot(legend = :best, size = (500, 500))
+	
+	for vary_val in sorted_values
+		solutions, _ = branches_dict[vary_val]
+		speeds = solutions[:, 1]
+		a₁ = solutions[:, 3]
+		
+		# plot as line with label
+		if varying_param == :none
+			plot!(speeds, a₁, lw = 2, label = "branch")
+		else
+			plot!(speeds, a₁, 
+				lw = 2, 
+				label = "$(varying_param) = $(round(vary_val, digits=3))")
+		end
+	end
+
+	xlabel!(L"c")
+	ylabel!(L"a_1")
+
+	return p
+end
+
+function plotBranchVariationsSubplots(dir_path::String; 
+                                      constant_param::Symbol,
+                                      constant_value::Real,
+                                      varied_param_range::Union{Nothing, Tuple{Real, Real}} = nothing)
+
+	"Creates a grid of subplots with one branch per subplot, where constant_param is held at the closest value to constant_value. Optionally filters by varied_param_range = (min, max)."
+
+	# validate directory
+	if !isdir(dir_path)
+		error("directory not found: $(dir_path)")
+	end
+
+	# collect all .jld2 files recursively
+	files = String[]
+	for (root, _, fs) in walkdir(dir_path)
+		for f in fs
+			endswith(f, ".jld2") && push!(files, joinpath(root, f))
+		end
+	end
+
+	if isempty(files)
+		error("no .jld2 files found in $(dir_path)")
+	end
+
+	# load all files
+	all_branches = Tuple{Matrix{Float64}, Constants}[]
+	for file_path in files
+		try
+			solutions, constants, metadata = readSolution(file_path)
+			push!(all_branches, (solutions, constants))
+		catch
+			continue
+		end
+	end
+
+	if isempty(all_branches)
+		error("no valid result files found in $(dir_path)")
+	end
+
+	# find the closest value of constant_param to the user's requested value
+	param_values = [getfield(branch[2], constant_param) for branch in all_branches]
+	unique_values = sort(unique(param_values))
+	closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
+	
+	# filter branches with this closest value
+	matching_branches = [branch for branch in all_branches 
+	                     if getfield(branch[2], constant_param) == closest_value]
+	
+	println("Plotting branches with $(constant_param) = $(closest_value)")
+
+	# detect which parameter varies
+	first_constants = matching_branches[1][2]
+	param_names = filter(f -> f ∉ [:z, :dz, :N], fieldnames(typeof(first_constants)))
+	
+	varying_params = Symbol[]
+	for param in param_names
+		param == constant_param && continue
+		values = [getfield(branch[2], param) for branch in matching_branches]
+		if length(unique(values)) > 1
+			push!(varying_params, param)
+		end
+	end
+	
+	varying_param = isempty(varying_params) ? :none : varying_params[1]
+	
+	# organize branches by varying parameter
+	branches_dict = Dict{Float64, Tuple{Matrix{Float64}, Constants}}()
+	for (solutions, constants) in matching_branches
+		key_val = varying_param == :none ? rand() : getfield(constants, varying_param)
+		branches_dict[key_val] = (solutions, constants)
+	end
+	
+	sorted_values = sort(collect(keys(branches_dict)))
+	
+	# filter by varied_param_range if specified
+	if !isnothing(varied_param_range) && varying_param != :none
+		min_val, max_val = varied_param_range
+		sorted_values = filter(v -> min_val <= v <= max_val, sorted_values)
+		
+		if isempty(sorted_values)
+			error("no branches found within varied_param_range = $(varied_param_range)")
+		end
+		
+		println("Filtered to $(length(sorted_values)) branches with $(varying_param) ∈ [$(min_val), $(max_val)]")
+	end
+	
+	# create one subplot per branch
+	subplots = []
+	for vary_val in sorted_values
+		solutions, _ = branches_dict[vary_val]
+		speeds = solutions[:, 1]
+		a₁ = solutions[:, 3]
+		
+		# create subplot with title showing varying parameter value
+		if varying_param == :none
+			p = plot(speeds, a₁, lw = 4, legend = false, title = "branch",
+			        xformatter = x -> string(round(x, digits=4)))
+		else
+			p = plot(speeds, a₁, lw = 4, legend = false, 
+			        title = "$(varying_param) = $(round(vary_val, digits=3))",
+			        xformatter = x -> string(round(x, digits=5)))
+		end
+		
+		xlabel!(L"c")
+		ylabel!(L"a_1")
+		
+		push!(subplots, p)
+	end
+
+	# determine grid layout (prefer roughly square)
+	n_plots = length(subplots)
+	n_cols = Int(ceil(sqrt(n_plots)))
+	n_rows = Int(ceil(n_plots / n_cols))
+	
+	# create final plot
+	p_final = plot(subplots..., layout = (n_rows, n_cols), size = (400 * n_cols, 400 * n_rows))
+	
+	return p_final
+end
+
 ## LEGACY 
 
 function plotting(solutions, index::Int, constants::Constants, shift_profiles = true)

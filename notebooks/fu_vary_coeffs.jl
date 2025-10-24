@@ -1,4 +1,4 @@
-# Batch compute fuSimple branches for N = 8:42 with robust error handling.
+# Batch compute fu branches for N = 8:40 with robust error handling
 
 # Load the project-wide functions and dependencies
 include(joinpath(@__DIR__, "..", "functions.jl"))
@@ -9,18 +9,17 @@ a1Vals = collect(range(0.01, 0.29, branchN + 1))
 
 L = π
 b = 0.1
-λ2 = 1.5
-vf = 1.0
+v = 1.0
 
-save_subdir = "fuSimpleVaryCoeffs"
+save_dir = "experiments/fu_vary_coeffs"
 
-@info "Starting batch run for N=8:42" date=Dates.now()
+@info "Starting batch run for N=8:40" date=Dates.now()
 
-for N in 8:42
+for N in 8:40
     @info "Starting N run" N=N
     try
         # Create constants
-        constants = fuSimpleConstants(N, L, b, λ2, vf)
+        constants = fuConstants(N, L, b, v)
 
         # Initialize wave speed from k1
         k1 = 1 * π / constants.L
@@ -37,11 +36,11 @@ for N in 8:42
                 a1Vals,
                 branchN,
                 constants,
-                tol = 1e-12,
+                tol = 1e-14,
                 solver = :NLSolver,
-                max_iter = 10000,
+                max_iter = 1000,
                 overwrite = true,
-                save_subdir = save_subdir,
+                save_dir = save_dir,
             )
             # Explicitly drop references to large results immediately after save
             solutions = nothing
@@ -60,3 +59,4 @@ for N in 8:42
 end
 
 @info "Batch run complete" date=Dates.now()
+
