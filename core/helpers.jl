@@ -8,7 +8,7 @@ function β(n, k, b, S0)
 	return real.(beta1 .+ beta2)
 end
 
-function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L::Real)::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
+function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L::Real)::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}
 	
     N = length(coefficients) - 1
 	n_domain = length(domain)
@@ -16,12 +16,15 @@ function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L
     S = zeros(Float64, n_domain)
     Sz = zeros(Float64, n_domain)
     Szz = zeros(Float64, n_domain)
+    Szzz = zeros(Float64, n_domain)
+    Szzzz = zeros(Float64, n_domain)
 
 	# Add constant offset to S
 	S .= coefficients[1] 
 	
-	# Pre-allocate buffer for cosine values to avoid recomputation
+	# Pre-allocate buffers for trig values to avoid recomputation
 	cos_kz = Vector{Float64}(undef, n_domain)
+	sin_kz = Vector{Float64}(undef, n_domain)
 	
 	π_over_L = π / Float64(L)  # Compute once and ensure Float64
 	
@@ -29,15 +32,18 @@ function fourierSeries(coefficients::Vector{Float64}, domain::Vector{Float64}, L
 		k = n * π_over_L  # Compute inline, no array allocation
 		coeff = coefficients[n + 1]
 		
-		# Compute trig values once, reuse for both S and Szz
+		# Compute trig values once, reuse for all derivatives
 		@. cos_kz = cos(k * domain)
+		@. sin_kz = sin(k * domain)
 		
 		@. S += coeff * cos_kz
-		@. Sz -= k * coeff * sin(k * domain)
-		@. Szz -= (k^2) * coeff * cos_kz  # Reuse cos_kz
+		@. Sz -= k * coeff * sin_kz
+		@. Szz -= (k^2) * coeff * cos_kz
+		@. Szzz += (k^3) * coeff * sin_kz
+		@. Szzzz += (k^4) * coeff * cos_kz
 	end
 		
-    return S, Sz, Szz
+    return S, Sz, Szz, Szzz, Szzzz
 end
 
 function recompute_solutions(file_path::String)

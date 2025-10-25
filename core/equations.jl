@@ -12,7 +12,7 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
-	S, Sz, Szz = fourierSeries(coeffs, constants.z, constants.L)
+	S, Sz, Szz, Szzz, Szzzz = fourierSeries(coeffs, constants.z, constants.L)
 
 	integrands = zeros(Float64, constants.N, length(constants.z))
 	integrals = zeros(Float64, constants.N)
@@ -24,6 +24,9 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	# define wall model
 	if constants isa ferrofluidConstants
 		one_p = (Szsq).*((c^2)./2 .- 1 ./ (S.*sqrt.(Szsq)) .+ Szz./(Szsq.^(3/2)) .+ constants.B./(2 .* S.^2) .+ constants.E);
+	elseif constants isa eulerBernoulliConstants
+		w = wall_model(Szzzz)
+		one_p = Szsq .* (c^2 .- 2 .* w)
 	else 
 		w = wall_model(constants, c, S)
 		one_p = Szsq .* (c^2 .- 2 .* w)

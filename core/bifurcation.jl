@@ -2,7 +2,7 @@
 
 using LinearAlgebra
 
-function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true)::Tuple{Matrix{Float64}, Constants, Dict{String, Any}}
+function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true, progress_interval::Int64 = 10)::Tuple{Matrix{Float64}, Constants, Dict{String, Any}}
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given initial guess, using a continuation scheme."
 
@@ -35,6 +35,9 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	# start timer
 	start_time = time()
+
+	lm_solver = LevenbergMarquardt(; autodiff = AutoFiniteDiff())
+	newton_solver = NewtonRaphson(; autodiff = AutoFiniteDiff())
 	
 	for i = 1:branchN
 
@@ -47,8 +50,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 			problem = NonlinearProblem(f, initial_guess[i,:])
 
 			# solve the problem with more conservative settings
-			sol = solve(problem, NewtonRaphson(; autodiff = AutoFiniteDiff()))
-			# sol = solve(problem, LevenbergMarquardt(; autodiff = AutoFiniteDiff()))
+			sol = solve(problem, newton_solver, abstol = tol, reltol = 1e-10, maxiters = max_iter)
 
 			solutions[i,:] = sol.u
 			iterations[i] = sol.stats.nsteps
@@ -72,9 +74,9 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 		# update intial guess with current solution
 		initial_guess[i+1,:] = solutions[i,:]
 
-        # print progress for every 10% of branch points 
-        if i % Int(round(0.1*branchN)) == 0 && verbose
-                println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
+        # print progress at every progress_interval steps if verbose is true
+        if progress_interval > 0 && i % progress_interval == 0 && verbose
+            println("Branch point $i of $branchN, $(Int(iterations[i])) iterations.")
         end
 
 		# check the average values of the last 20% of coefficients every 5% of branch points (TODO: maybe there is a more precise way to do this)

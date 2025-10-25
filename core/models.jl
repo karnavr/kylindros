@@ -93,16 +93,6 @@ function c0(k, constants::fuConstants)
 	
 end
 
-# function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
-
-#     v = constants.v
-    
-#     # Add a small epsilon to prevent division by zero
-#     @. w = (1/2) * (1 .- (1 ./ (S.^4))) .* (c .- v).^2
-
-#     return real.(w)
-# end
-
 function wall_model(constants::fuConstants, c::Float64, S::Vector{Float64})
     v = constants.v
     w = 0.5 .* (1 .- (1 ./ (S .^ 4))) .* (c - v)^2
@@ -163,4 +153,48 @@ function wall_model(constants::fuSimpleConstants, c, S)
 	w = (λ2^2)/2 .* (1 .- (1 ./ (S.^4))) .* (c - vf/λ2)^2
 
 	return w
+end
+
+## EULER-BERNOULLI
+
+struct eulerBernoulliConstants <: Constants
+	N::Int64  					# number of modes for solution S(z)
+	L::Real                   	# half-domain length
+	
+	# domain definition
+	dz::Float64 				# domain spacing
+    z::Vector{Float64} 			# domain vector of values (2N + 2 points)
+
+	# physical geometry constants 
+	b::Float64 					# inner rod radius
+
+	function eulerBernoulliConstants(N::Int64, L::Real, b::Float64)
+		dz = 2*L / (2*N+1)
+		z = collect(-Float64(L):dz:Float64(L))
+		
+		new(N, L, dz, z, b)
+	end
+end
+
+function c0(k, constants::eulerBernoulliConstants)
+	## linearized wave speed for small amplitude waves c(k)
+
+	b = constants.b
+
+	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
+	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
+
+	c0 = real.(sqrt((β0 / (β0 + k*β1)) .* (k.^4)))
+
+	return c0
+end
+
+function wall_model(Szzzz::Vector{Float64})
+
+	## wall model for euler-bernoulli beam
+
+	w = Szzzz
+	
+	return w
+	
 end
