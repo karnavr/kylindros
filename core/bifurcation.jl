@@ -29,6 +29,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	# initialize flags array (for each branch point)
 	flags = fill(NaN, branchN)
+	errors = zeros(Float64, branchN)
 
 	# condition numbers per branch point (only filled for :NLSolver for now)
 	condition_numbers = zeros(Float64, branchN)
@@ -38,7 +39,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	lm_solver = LevenbergMarquardt(; autodiff = AutoFiniteDiff())
 	newton_solver = NewtonRaphson(; autodiff = AutoFiniteDiff())
-	
+
 	for i = 1:branchN
 
 		if solver == :NLSolver
@@ -60,6 +61,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 			funcJ(u) = equations(u, constants, a1Vals[i], 1.0)
 			J = finite_diff_jacobian(funcJ, sol.u)
 			condition_numbers[i] = cond(J)
+			errors[i] = norm(sol.resid)
 
 		else
 
@@ -68,6 +70,8 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 			# solve for the current branch point + capture
 			solutions[i,:], iterations[i], flags[i] = mySolver(func, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)
+
+			errors[i] = norm(func(solutions[i,:]))
 			
 		end
 
@@ -91,13 +95,6 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 
 	# end timer and compute time 
 	computation_time = time() - start_time
-
-	# compute error (L2 norm) for each branch point
-	errors = zeros(Float64, branchN)
-	for i = 1:branchN
-		errors[i] = norm(equations(solutions[i,:], constants, a1Vals[i], 1.0))
-	end
-
 
 	## SAVING RESULTS
 
