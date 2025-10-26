@@ -106,3 +106,43 @@ function solve_quadratic(a::Float64, b::Float64, c::Float64)
         return (-b + sqrt(Δ)) / (2*a)  # Return real roots
     end
 end
+
+function compute_cauchy_error(fileN_path::String, fileNm2_path::String, idx::Int)
+
+	"Compute Cauchy convergence error E_N = ||S_N - S_{N-2}||_{L2} for branch index idx. Returns (E_N, a1)."
+
+	# ========== Load solutions ==========
+	solsN, constsN, _ = readSolution(fileN_path)
+	solsNm2, constsNm2, _ = readSolution(fileNm2_path)
+
+	# ========== Validation checks ==========
+	if constsN.L != constsNm2.L
+		error("L mismatch between N=$(constsN.N) and N=$(constsNm2.N)")
+	end
+
+	if idx > size(solsN, 1) || idx > size(solsNm2, 1)
+		error("Index $idx out of bounds (N branch: $(size(solsN,1)), N-2 branch: $(size(solsNm2,1)))")
+	end
+
+	# ========== Extract Fourier coefficients ==========
+	# Extract from column 2 onward (includes amplitude A and Fourier coefficients)
+	coeffsN = solsN[idx, 2:end]
+	coeffsNm2 = solsNm2[idx, 2:end]
+
+	# ========== Reconstruct profiles on common grid ==========
+	# Use finer grid from N run for evaluation
+	z_grid = constsN.z
+	L = constsN.L
+
+	S_N = fourierSeries(coeffsN, z_grid, L)[1]
+	S_Nm2 = fourierSeries(coeffsNm2, z_grid, L)[1]
+
+	# ========== Compute continuous L2 norm ==========
+	diff_sq = (S_N .- S_Nm2).^2
+	E_N = sqrt(trapz(z_grid, diff_sq))
+
+	# Extract a1 coefficient for labeling (column 3 of solution array)
+	a1 = solsN[idx, 3]
+
+	return E_N, a1
+end

@@ -2,7 +2,7 @@
 
 ## Functions for each type of plot
 
-function plot_profiles(solutions, constants::Constants; shift_profiles = true, line_color = theme_palette(:default)[1])
+function plot_profiles(solutions, constants; shift_profiles = true, line_color = theme_palette(:default)[1], lw = 2)
 
 	## plot three profiles from the solutions branch (equally spaced in the last 0.75 of the branch)
 
@@ -45,14 +45,14 @@ function plot_profiles(solutions, constants::Constants; shift_profiles = true, l
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
 	for (i, index) in enumerate(indices)
-		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=2, linestyle = linestyles[i], color = line_color)
+		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=lw, linestyle = linestyles[i], color = line_color)
 	end
 	xlabel!(L"z"); ylabel!(L"S")
 
 	return p
 end
 
-function repeat_profiles(solutions, constants::Constants; indices = [size(solutions,1)], n_periods::Int = 3, figure_size = nothing)
+function repeat_profiles(solutions, constants; indices = [size(solutions,1)], n_periods::Int = 3, figure_size = nothing, lw = 2)
 
 	## plot up to three profiles (by branch indices) repeated n_periods times with shared y-axis scale
 
@@ -115,7 +115,7 @@ function repeat_profiles(solutions, constants::Constants; indices = [size(soluti
 	subplots = []
 	for i in 1:length(indices)
 		p_i = plot(z_series[i], prof_series[i],
-			lw = 2,
+			lw = lw,
 			color = :steelblue,
 			legend = false,
 			ylims = ylims_shared)
@@ -438,6 +438,109 @@ function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol 
 	elseif metric == :condition
 		ylabel!(L"\sigma (J)")
 	end
+
+	if yscale == :log10
+		plot!(yaxis = :log10)
+	end
+
+	return p
+end
+
+function plot_cauchy_error(dirpath::String; indices::Vector{Int}, yscale::Symbol = :log10, legend_position = :best)
+
+	"Plot Cauchy convergence error E_N = ||S_N - S_{N-2}||_{L2} vs N for specified branch indices."
+
+	# ========== Directory validation ==========
+	if !isdir(dirpath)
+		error("Results directory not found: $(dirpath)")
+	end
+
+	# ========== Build file mapping by N ==========
+	# Walk directory tree and map N => filepath for each available truncation level
+	files_by_N = Dict{Int, String}()
+
+	for (root, _, filenames) in walkdir(dirpath)
+		for fname in filenames
+			if endswith(fname, ".jld2")
+				fpath = joinpath(root, fname)
+				try
+					_, constants, _ = readSolution(fpath)
+					N = Int(constants.N)
+					files_by_N[N] = fpath  # Keep latest file for each N
+				catch
+					# Skip unreadable files silently
+					continue
+				end
+			end
+		end
+	end
+
+	if isempty(files_by_N)
+		error("No valid result files found in $(dirpath)")
+	end
+
+	N_vals = sort(collect(keys(files_by_N)))
+
+	# ========== Compute Cauchy errors ==========
+	# Storage: idx => [(N, E_N, a1), ...]
+	data_by_idx = Dict{Int, Vector{Tuple{Int, Float64, Float64}}}()
+	for idx in indices
+		data_by_idx[idx] = []
+	end
+
+	# Compute errors for each N where N-2 exists
+	for N in N_vals
+		if (N - 2) in keys(files_by_N)
+			fileN = files_by_N[N]
+			fileNm2 = files_by_N[N - 2]
+
+			# Try to compute for each requested index
+			for idx in indices
+				try
+					E_N, a1 = compute_cauchy_error(fileN, fileNm2, idx)
+
+					# Store if valid
+					if E_N > 0 && isfinite(E_N)
+						push!(data_by_idx[idx], (N, E_N, a1))
+					end
+				catch e
+					@warn "Failed to compute Cauchy error" N=N idx=idx error=e
+					continue
+				end
+			end
+		end
+	end
+
+	# ========== Create plot ==========
+	p = plot(legend = legend_position, size = (500, 500))
+
+	# Plot each branch index as a separate series
+	for idx in indices
+		data = data_by_idx[idx]
+
+		if isempty(data)
+			@warn "No data for index $idx"
+			continue
+		end
+
+		# Sort by N
+		perm = sortperm(data; by = x -> x[1])
+		sorted = data[perm]
+
+		N_plot = [t[1] for t in sorted]
+		E_plot = [t[2] for t in sorted]
+		a1_label = sorted[end][3]  # Use a1 from largest N
+
+		plot!(N_plot, E_plot,
+			lw = 2,
+			marker = :circle,
+			markersize = 4,
+			label = "a₁ = $(round(a1_label, digits=3))")
+	end
+
+	# ========== Axes and formatting ==========
+	xlabel!(L"N")
+	ylabel!(L"E_N")
 
 	if yscale == :log10
 		plot!(yaxis = :log10)
