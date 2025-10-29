@@ -198,3 +198,51 @@ function wall_model(Szzzz::Vector{Float64})
 	return w
 	
 end
+
+## KIRCHHOFF-LOVE
+
+struct kirchhoffLoveConstants <: Constants
+	N::Int64  					# number of modes for solution S(z)
+	L::Real                   	# half-domain length
+	
+	# domain definition
+	dz::Float64 				# domain spacing
+    z::Vector{Float64} 			# domain vector of values (2N + 2 points)
+
+	# physical geometry constants 
+	b::Float64 					# inner rod radius
+
+	function kirchhoffLoveConstants(N::Int64, L::Real, b::Float64)
+		dz = 2*L / (2*N+1)
+		z = collect(-Float64(L):dz:Float64(L))
+		
+		new(N, L, dz, z, b)
+	end
+end
+
+function c0(k, constants::kirchhoffLoveConstants)
+	## linearized wave speed for small amplitude waves c(k)
+
+	b = constants.b
+
+	β0 = besseli(1, k) * besselk(1, k*b) - besseli(1, k*b) * besselk(1, k)
+	β1 = besseli(1, k*b) * besselk(0, k) + besseli(0, k) * besselk(1, k*b) - (1/k)*β0
+
+	c0 = real.(sqrt((β0 / (β0 + k*β1)) .* (k.^4)))
+
+	return c0
+end
+
+function wall_model(Sz::Vector{Float64}, Szz::Vector{Float64}, Szzz::Vector{Float64}, Szzzz::Vector{Float64})
+
+	## wall model for kirchhoff-love shell
+
+	Q = 1 .+ Sz.^2
+	
+	numerator = Q.^2 .* Szzzz .- 9 .* Q .* Sz .* Szz .* Szzz .+ 3 .* (4 .* Sz.^2 .- 1) .* Szz.^3
+	
+	w = numerator ./ (Q.^(7/2))
+	
+	return w
+	
+end

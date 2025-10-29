@@ -27,6 +27,9 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	elseif constants isa eulerBernoulliConstants
 		w = wall_model(Szzzz)
 		one_p = Szsq .* (c^2 .- 2 .* w)
+	elseif constants isa kirchhoffLoveConstants
+		w = wall_model(Sz, Szz, Szzz, Szzzz)
+		one_p = Szsq .* (c^2 .- 2 .* w)
 	else 
 		w = wall_model(constants, c, S)
 		one_p = Szsq .* (c^2 .- 2 .* w)
@@ -88,6 +91,12 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 		prod .= row .* cos_row
 		integrals[n] = trapz(constants.z, prod)
 	end
+
+	# global scaling (applies uniformly to all modes)
+	# s_global = maximum(abs, integrands)
+	# if isfinite(s_global) && s_global != 0.0
+	# 	integrals ./= s_global
+	# end
 
 	eqs[1:constants.N] = integrals
 	eqs[constants.N+1] = abs(a0 - a₀)
