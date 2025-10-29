@@ -27,25 +27,25 @@ function plot_profiles(solutions, constants; shift_profiles = true, line_color =
 	# find closest actual solution for each target a₁
 	indices = [indices_range[argmin(abs.(a1_vals .- target))] for target in target_a1]
 
-	# create array for profiles
-	profiles = zeros(branchN,length(z))
-	
-	# convert profiles
-	Threads.@threads for i = 1:branchN
-		profiles[i,:] .= fourierSeries(coeffs[i,:], z, L)[1]
-	end
+    # reconstruct only the profiles we plan to plot
+    selected_profiles = Vector{Vector{Float64}}(undef, length(indices))
+    half = shift_profiles ? div(length(z), 2) : 0
 
-	# shift profiles to the right over by L
-	if shift_profiles == true
-		profiles = [profiles[:,Int(end/2)+1:end] profiles[:,1:Int(end/2)]]; nothing
-	end
+    for (j, idx) in pairs(indices)
+        profile = fourierSeries(coeffs[idx, :], z, L)[1]
+        if shift_profiles
+            profile = vcat(profile[half+1:end], profile[1:half])
+        end
+        selected_profiles[j] = profile
+    end
 
 	linestyles = [:dashdot, :dash, :solid]
 
 	# plot profiles
 	p = plot(legend = true, size = (500,500))
-	for (i, index) in enumerate(indices)
-		plot!(z, profiles[index,:], label = "a₁ = $(round(solutions[index,3], digits=3))", lw=lw, linestyle = linestyles[i], color = line_color)
+    for (i, index) in enumerate(indices)
+        profile = selected_profiles[i]
+        plot!(z, profile, label = "a₁ = $(round(solutions[index,3], digits=3))", lw=lw, linestyle = linestyles[i], color = line_color)
 	end
 	xlabel!(L"z"); ylabel!(L"S")
 
