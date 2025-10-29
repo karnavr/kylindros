@@ -52,92 +52,88 @@ function plot_profiles(solutions, constants; shift_profiles = true, line_color =
 	return p
 end
 
-function repeat_profiles(solutions, constants; indices = [size(solutions,1)], n_periods::Int = 3, figure_size = nothing, lw = 2)
-
-	## plot up to three profiles (by branch indices) repeated n_periods times with shared y-axis scale
-
+function plot_long_profiles(solutions, constants; 
+                           indices = [size(solutions,1)], 
+                           n_periods::Int = 3, 
+                           figure_size = nothing,
+                           lw = 2)
+	
+	"Plot wave profiles repeated n_periods times with vertically stacked subplots and shared y-axis scale."
+	
 	# get needed constants
 	L = constants.L
 	z = constants.z
-
+	branchN = size(solutions, 1)
+	
 	# input validation
 	if n_periods < 1
 		error("n_periods must be ≥ 1")
 	end
-	if length(indices) < 1 || length(indices) > 3
-		error("provide 1 to 3 indices")
+	if length(indices) < 1
+		error("at least 1 index must be provided")
 	end
-	branchN = size(solutions, 1)
 	for idx in indices
 		if idx < 1 || idx > branchN
 			error("index $idx is out of bounds (1:$branchN)")
 		end
 	end
-
-	# helper to build a repeated profile and extended domain without duplicate junctions
-	function build_tiled_profile(coeffs, z, L, n_periods)
-		profile = fourierSeries(coeffs, z, L)[1]
-		period = z[end] - z[1]
-		z_ext = Vector{eltype(z)}()
-		prof_ext = Vector{eltype(profile)}()
-		for i = 0:(n_periods-1)
-			if i == 0
-				append!(z_ext, z)
-				append!(prof_ext, profile)
-			else
-				append!(z_ext, (z[2:end] .+ i * period))
-				append!(prof_ext, profile[2:end])
-			end
-		end
-		return z_ext, prof_ext
-	end
-
-	# build tiled series for requested indices
-	z_series = Vector{Vector{eltype(z)}}()
-	prof_series = Vector{Vector{Float64}}()
+	
+	# tile all profiles using the helper function
+	z_tiled_series = []
+	S_tiled_series = []
 	for idx in indices
 		coeffs = solutions[idx, 2:end]
-		z_ext, prof_ext = build_tiled_profile(coeffs, z, L, n_periods)
-		push!(z_series, z_ext)
-		push!(prof_series, prof_ext)
+		z_tiled, S_tiled = tile_profile(coeffs, z, L, n_periods)
+		push!(z_tiled_series, z_tiled)
+		push!(S_tiled_series, S_tiled)
 	end
-
-	# compute shared y-limits
-	global_min = minimum(minimum.(prof_series))
-	global_max = maximum(maximum.(prof_series))
-	y_margin = 0.05 * (global_max - global_min)
-	if y_margin == 0
-		y_margin = 0.01
-	end
-	ylims_shared = (global_min - y_margin, global_max + y_margin)
-
-	# assemble subplots in a single row
+	
+	# compute shared y-limits across all profiles with 5% margin
+	all_S_values = vcat(S_tiled_series...)
+	ymin = minimum(all_S_values)
+	ymax = maximum(all_S_values)
+	y_range = ymax - ymin
+	y_margin = 0.05 * y_range
+	ylims_shared = (ymin - y_margin, ymax + y_margin)
+	
+	# create subplots
 	subplots = []
 	for i in 1:length(indices)
-		p_i = plot(z_series[i], prof_series[i],
+		p_i = plot(z_tiled_series[i], S_tiled_series[i],
 			lw = lw,
-			color = :steelblue,
 			legend = false,
 			ylims = ylims_shared)
-		xlabel!(L"z")
+		
+		# only add x-label to the last subplot
+		if i == length(indices)
+			xlabel!(L"z")
+		end
 		ylabel!(L"S")
 		push!(subplots, p_i)
 	end
-
-	# stack subplots top-to-bottom and either use provided size or auto-scale height
+	
+	# assemble final figure with vertical stacking
 	if figure_size === nothing
 		fig_width = 1000
 		fig_height = 300 * length(subplots)
-		p = plot(subplots..., layout = (length(subplots), 1), size = (fig_width, fig_height))
+		p = plot(subplots..., 
+			layout = (length(subplots), 1), 
+			size = (fig_width, fig_height),
+			left_margin = 2mm,
+			right_margin = 2mm,
+			top_margin = 2mm,
+			bottom_margin = 2mm)
 	else
-		p = plot(subplots..., layout = (length(subplots), 1), size = figure_size)
+		p = plot(subplots..., 
+			layout = (length(subplots), 1), 
+			size = figure_size,
+			left_margin = 2mm,
+			right_margin = 2mm,
+			top_margin = 2mm,
+			bottom_margin = 2mm)
 	end
+	
 	return p
-end
-
-# Backward-compatible method: single index positional argument
-function repeat_profiles(solutions, constants::Constants, index::Int; n_periods::Int = 3, figure_size = nothing)
-	return repeat_profiles(solutions, constants; indices = [index], n_periods = n_periods, figure_size = figure_size)
 end
 
 function plot_branch(solutions, metadata; color_by_error = false)
@@ -179,11 +175,19 @@ function plot_coeffs(solutions, indices = round.(Int, range(1, size(solutions,1)
 	# get coeffs
 	coeffs = solutions[:,2:end]
 
+	# choose shared ticks and padded limits from all selected series
+	allY = Float64[]
+	for i in indices
+		append!(allY, abs.(solutions[Int(i), 2:end]))
+	end
+	(yticks, ylims) = log_ticks_and_limits(allY; step=4, pad_decades=0.5)
+
 	# plot the coefficients
 	p = plot(legend=false, size = (500,500))
 	for index in indices
 		plot!(abs.(coeffs[Int(index),:]), 
-			yaxis=:log, 
+			yaxis=:log10,
+			yticks=yticks, ylims=ylims, minorticks=true,
 			label = "a₁ = $(round(solutions[Int(index),3], digits=3))", 
 			marker = :circle,
 			markersize = 3,
@@ -224,6 +228,118 @@ function plot_error(solutions, metadata)
 	return p
 end
 
+function plot_profilesVScoeffs(solutions, constants;
+                               indices = [size(solutions,1)],
+                               shift_profiles = false,
+                               n_periods::Int = 1,
+                               figure_size = nothing)
+	
+	"Plot wave profiles alongside their Fourier coefficients with shared y-axis scale for profiles."
+	
+	# get needed constants
+	L = constants.L
+	z = constants.z
+	branchN = size(solutions, 1)
+	
+	# input validation
+	if length(indices) < 1
+		error("at least 1 index must be provided")
+	end
+	for idx in indices
+		if idx < 1 || idx > branchN
+			error("index $idx is out of bounds (1:$branchN)")
+		end
+	end
+	if n_periods < 1
+		error("n_periods must be ≥ 1")
+	end
+	
+	# compute all profiles, shift, and tile them
+	z_arrays = []
+	profile_arrays = []
+	for idx in indices
+		coeffs = solutions[idx, 2:end]
+		profile = fourierSeries(coeffs, z, L)[1]
+		if shift_profiles
+			profile = [profile[Int(end/2)+1:end]; profile[1:Int(end/2)]]
+		end
+		
+		# tile the profile
+		z_tiled, profile_tiled = tile_profile(profile, z, n_periods)
+		push!(z_arrays, z_tiled)
+		push!(profile_arrays, profile_tiled)
+	end
+	
+	# compute shared y-limits with 5% margin
+	ymin = minimum(minimum.(profile_arrays))
+	ymax = maximum(maximum.(profile_arrays))
+	y_range = ymax - ymin
+	y_margin = 0.05 * y_range
+	ylims_shared = (ymin - y_margin, ymax + y_margin)
+
+	# compute shared coefficient ticks/limits across all selected indices
+	all_coeff_mags = vcat([abs.(solutions[j, 2:end]) for j in indices]...)
+	(yticks_coeff, ylims_coeff) = log_ticks_and_limits(all_coeff_mags; step=4, pad_decades=0.5)
+	
+	# create individual plots for each index
+	all_plots = []
+	for (i, idx) in enumerate(indices)
+		coeffs = solutions[idx, 2:end]
+		
+		# profile plot (left column)
+		p_profile = plot(z_arrays[i], profile_arrays[i],
+			lw = 2,
+			legend = false,
+			ylims = ylims_shared)
+		xlabel!(L"z")
+		ylabel!(L"S")
+		
+		# coefficient plot (right column)
+		p_coeffs = plot(abs.(coeffs),
+			yaxis = :log10,
+			yticks = yticks_coeff,
+			ylims = ylims_coeff,
+			minorticks = true,
+			marker = :circle,
+			markersize = 3,
+			markerstrokewidth = 0,
+			markerstrokealpha = 0,
+			legend = false)
+		xlabel!("n")
+		ylabel!(L"a_n")
+		
+		# add both plots to array
+		push!(all_plots, p_profile)
+		push!(all_plots, p_coeffs)
+	end
+	
+	# assemble final figure with 2-column grid layout
+	# make each subplot square (400x400)
+	n_rows = length(indices)
+	if figure_size === nothing
+		subplot_size = 400
+		fig_width = 2 * subplot_size
+		fig_height = n_rows * subplot_size
+		p = plot(all_plots...,
+			layout = (n_rows, 2),
+			size = (fig_width, fig_height),
+			left_margin = 4mm,
+			right_margin = 4mm,
+			top_margin = 4mm,
+			bottom_margin = 4mm)
+	else
+		p = plot(all_plots...,
+			layout = (n_rows, 2),
+			size = figure_size,
+			left_margin = 4mm,
+			right_margin = 4mm,
+			top_margin = 4mm,
+			bottom_margin = 4mm)
+	end
+	
+	return p
+end
+
 ## Plot everything 
 
 function plotEverything(solutions, constants, metadata)
@@ -240,134 +356,7 @@ function plotEverything(solutions, constants, metadata)
 	return p
 end
 
-function plot_comparison_wrapper(solutions, constants::Constants; 
-                                indices = [Int(round(0.75*size(solutions,1))), size(solutions,1)],
-                                shift_profiles = true,
-                                save_figure = false,
-                                filename = nothing,
-                                figure_size = (1200, 800))
-
-	## Create a figure comparing profiles and coefficients for multiple solutions
-	
-	# Validate inputs
-	if save_figure && filename === nothing
-		error("filename must be provided when save_figure=true")
-	end
-	
-	if length(indices) < 1
-		error("at least 1 index must be provided")
-	end
-	
-	branchN = size(solutions, 1)
-	for idx in indices
-		if idx < 1 || idx > branchN
-			error("index $idx is out of bounds (1:$branchN)")
-		end
-	end
-	
-	# Calculate y-axis limits for consistent scaling across all profiles
-	L = constants.L
-	z = constants.z
-	all_profiles = []
-	
-	for idx in indices
-		coeffs = solutions[idx, 2:end]
-		profile = fourierSeries(coeffs, z, L)[1]
-		if shift_profiles
-			profile = [profile[Int(end/2)+1:end]; profile[1:Int(end/2)]]
-		end
-		push!(all_profiles, profile)
-	end
-	
-	# Find global y-limits
-	global_min = minimum(minimum.(all_profiles))
-	global_max = maximum(maximum.(all_profiles))
-	y_margin = 0.05 * (global_max - global_min)
-	ylims = (global_min - y_margin, global_max + y_margin)
-	
-	# Helper function to plot a single profile with consistent y-limits
-	function plot_single_profile(solutions, constants, index, ylims; shift_profiles = true)
-		# get needed constants
-		L = constants.L
-		z = constants.z
-		
-		# get coefficients for this solution
-		coeffs = solutions[index, 2:end]
-		
-		# convert to profile
-		profile = fourierSeries(coeffs, z, L)[1]
-		
-		# shift profile if requested
-		if shift_profiles
-			profile = [profile[Int(end/2)+1:end]; profile[1:Int(end/2)]]
-		end
-		
-		# create plot with consistent y-limits
-		p = plot(z, profile, 
-			label = "a₁ = $(round(solutions[index,3], digits=3))", 
-			lw = 2, 
-			color = :steelblue,
-			legend = false,
-			ylims = ylims,
-			size = (400, 400))
-		xlabel!(L"z")
-		ylabel!(L"S")
-		
-		return p
-	end
-	
-	# Helper function to plot coefficients for a single solution
-	function plot_single_coeffs(solutions, index)
-		# get coefficients for this solution
-		coeffs = solutions[index, 2:end]
-		
-		# create plot
-		p = plot(abs.(coeffs), 
-			yaxis = :log, 
-			label = "a₁ = $(round(solutions[index,3], digits=3))", 
-			marker = :circle,
-			markersize = 3,
-			markerstrokewidth = 0,
-			markerstrokealpha = 0,
-			legend = false,
-			size = (400, 400))
-		xlabel!("n")
-		ylabel!(L"a_n")
-		
-		return p
-	end
-	
-	# Create plots for all indices
-	profile_plots = []
-	coeff_plots = []
-	
-	for idx in indices
-		push!(profile_plots, plot_single_profile(solutions, constants, idx, ylims; shift_profiles = shift_profiles))
-		push!(coeff_plots, plot_single_coeffs(solutions, idx))
-	end
-	
-	# Strict two-column layout: profiles left, coefficients right
-	n_solutions = length(indices)
-	all_plots = []
-	for i in 1:n_solutions
-		push!(all_plots, profile_plots[i])
-		push!(all_plots, coeff_plots[i])
-	end
-
-	# Create final plot with no empty panes
-	p = plot(all_plots..., layout = (n_solutions, 2), size = figure_size)
-	
-	# Save figure if requested
-	if save_figure
-		savefig(p, filename)
-		println("Figure saved as: $filename")
-	end
-	
-	return p
-end
-
-
-function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol = :error, yscale::Symbol = :log10, legend_position = :best)
+function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol = :error, yscale::Symbol = :log10, legend_position = :best, step::Int = 2)
 
 	# Use the directory exactly as provided and gather all .jld2 files recursively
 	if !isdir(dirpath)
@@ -436,17 +425,29 @@ function plot_metric_vs_N(dirpath::String; indices::Vector{Int}, metric::Symbol 
 	if metric == :error
 		ylabel!("Error")
 	elseif metric == :condition
-		ylabel!(L"\sigma (J)")
+		ylabel!(L"\sigma (J_N)")
 	end
 
 	if yscale == :log10
-		plot!(yaxis = :log10)
+		# collect all positive y values to set shared ticks/limits
+		all_y = Float64[]
+		for entries in values(data_by_index)
+			for tup in entries
+				push!(all_y, tup[2])
+			end
+		end
+		if !isempty(all_y)
+			(yticks, ylims) = log_ticks_and_limits(all_y; step=step, pad_decades=0.5)
+			plot!(yaxis = :log10, yticks = yticks, ylims = ylims, minorticks = true)
+		else
+			plot!(yaxis = :log10)
+		end
 	end
 
 	return p
 end
 
-function plot_cauchy_error(dirpath::String; indices::Vector{Int}, yscale::Symbol = :log10, legend_position = :best)
+function plot_cauchy_error(dirpath::String; indices::Vector{Int}, yscale::Symbol = :log10, legend_position = :best, step::Int = 2)
 
 	"Plot Cauchy convergence error E_N = ||S_N - S_{N-2}||_{L2} vs N for specified branch indices."
 
@@ -543,7 +544,19 @@ function plot_cauchy_error(dirpath::String; indices::Vector{Int}, yscale::Symbol
 	ylabel!(L"E_N")
 
 	if yscale == :log10
-		plot!(yaxis = :log10)
+		# gather all positive error values to define ticks/limits
+		all_y = Float64[]
+		for vec in values(data_by_idx)
+			for tup in vec
+				push!(all_y, tup[2])
+			end
+		end
+		if !isempty(all_y)
+			(yticks, ylims) = log_ticks_and_limits(all_y; step=step, pad_decades=0.5)
+			plot!(yaxis = :log10, yticks = yticks, ylims = ylims, minorticks = true)
+		else
+			plot!(yaxis = :log10)
+		end
 	end
 
 	return p
@@ -681,11 +694,11 @@ end
 ## PARAMETER VARIATION PLOTS
 
 function plotBranchVariations(dir_path::String; 
-                             constant_param::Symbol, 
-                             constant_value::Real,
+                             constant_param::Union{Symbol, Nothing} = nothing, 
+                             constant_value::Union{Real, Nothing} = nothing,
                              varied_param_range::Union{Nothing, Tuple{Real, Real}} = nothing)
 
-	"Plots multiple solution branches from a directory, using the closest available value for constant_param and automatically detecting which parameter varies. Optionally filters by varied_param_range = (min, max)."
+	"Plots multiple solution branches from a directory. If constant_param and constant_value are provided, filters branches to the closest value of constant_param. Automatically detects which parameter varies. Optionally filters by varied_param_range = (min, max)."
 
 	# validate directory
 	if !isdir(dir_path)
@@ -721,23 +734,30 @@ function plotBranchVariations(dir_path::String;
 		error("no valid result files found in $(dir_path)")
 	end
 
-	# find the closest value of constant_param to the user's requested value
-	param_values = [getfield(branch[2], constant_param) for branch in all_branches]
-	unique_values = sort(unique(param_values))
-	
-	# find closest value
-	closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
-	
-	# filter branches with this closest value
-	matching_branches = Tuple{Matrix{Float64}, Constants}[]
-	for (solutions, constants) in all_branches
-		if getfield(constants, constant_param) == closest_value
-			push!(matching_branches, (solutions, constants))
+	# filter by constant_param if provided
+	if !isnothing(constant_param) && !isnothing(constant_value)
+		# find the closest value of constant_param to the user's requested value
+		param_values = [getfield(branch[2], constant_param) for branch in all_branches]
+		unique_values = sort(unique(param_values))
+		
+		# find closest value
+		closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
+		
+		# filter branches with this closest value
+		matching_branches = Tuple{Matrix{Float64}, Constants}[]
+		for (solutions, constants) in all_branches
+			if getfield(constants, constant_param) == closest_value
+				push!(matching_branches, (solutions, constants))
+			end
 		end
-	end
 
-	# print what value is actually constant
-	println("Plotting branches with $(constant_param) = $(closest_value)")
+		# print what value is actually constant
+		println("Plotting branches with $(constant_param) = $(closest_value)")
+	else
+		# no filtering - use all branches
+		matching_branches = all_branches
+		println("Plotting all $(length(matching_branches)) branches")
+	end
 
 	# detect which parameter varies across the matching files
 	# get all field names from the first constants struct (excluding z, dz)
@@ -747,7 +767,10 @@ function plotBranchVariations(dir_path::String;
 	# find parameters that vary
 	varying_params = Symbol[]
 	for param in param_names
-		param == constant_param && continue  # skip the constant parameter
+		# skip the constant parameter if one was specified
+		if !isnothing(constant_param) && param == constant_param
+			continue
+		end
 		
 		values = [getfield(branch[2], param) for branch in matching_branches]
 		unique_vals = unique(values)
@@ -822,11 +845,11 @@ function plotBranchVariations(dir_path::String;
 end
 
 function plotBranchVariationsSubplots(dir_path::String; 
-                                      constant_param::Symbol,
-                                      constant_value::Real,
+                                      constant_param::Union{Symbol, Nothing} = nothing,
+                                      constant_value::Union{Real, Nothing} = nothing,
                                       varied_param_range::Union{Nothing, Tuple{Real, Real}} = nothing)
 
-	"Creates a grid of subplots with one branch per subplot, where constant_param is held at the closest value to constant_value. Optionally filters by varied_param_range = (min, max)."
+	"Creates a grid of subplots with one branch per subplot. If constant_param and constant_value are provided, filters branches to the closest value of constant_param. Automatically detects which parameter varies. Optionally filters by varied_param_range = (min, max)."
 
 	# validate directory
 	if !isdir(dir_path)
@@ -860,16 +883,23 @@ function plotBranchVariationsSubplots(dir_path::String;
 		error("no valid result files found in $(dir_path)")
 	end
 
-	# find the closest value of constant_param to the user's requested value
-	param_values = [getfield(branch[2], constant_param) for branch in all_branches]
-	unique_values = sort(unique(param_values))
-	closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
-	
-	# filter branches with this closest value
-	matching_branches = [branch for branch in all_branches 
-	                     if getfield(branch[2], constant_param) == closest_value]
-	
-	println("Plotting branches with $(constant_param) = $(closest_value)")
+	# filter by constant_param if provided
+	if !isnothing(constant_param) && !isnothing(constant_value)
+		# find the closest value of constant_param to the user's requested value
+		param_values = [getfield(branch[2], constant_param) for branch in all_branches]
+		unique_values = sort(unique(param_values))
+		closest_value = unique_values[argmin(abs.(unique_values .- constant_value))]
+		
+		# filter branches with this closest value
+		matching_branches = [branch for branch in all_branches 
+		                     if getfield(branch[2], constant_param) == closest_value]
+		
+		println("Plotting branches with $(constant_param) = $(closest_value)")
+	else
+		# no filtering - use all branches
+		matching_branches = all_branches
+		println("Plotting all $(length(matching_branches)) branches")
+	end
 
 	# detect which parameter varies
 	first_constants = matching_branches[1][2]
@@ -877,7 +907,10 @@ function plotBranchVariationsSubplots(dir_path::String;
 	
 	varying_params = Symbol[]
 	for param in param_names
-		param == constant_param && continue
+		# skip the constant parameter if one was specified
+		if !isnothing(constant_param) && param == constant_param
+			continue
+		end
 		values = [getfield(branch[2], param) for branch in matching_branches]
 		if length(unique(values)) > 1
 			push!(varying_params, param)
@@ -940,6 +973,118 @@ function plotBranchVariationsSubplots(dir_path::String;
 	
 	return p_final
 end
+
+
+## Helper functions
+
+"""
+Return tick positions every `step` decades and padded y-limits by
+`pad_decades` (fractional decades). Lets Plots.jl format labels and draw
+minors; we only provide positions and limits.
+"""
+function log_ticks_and_limits(y::AbstractVector; step::Int = 4, pad_decades::Float64 = 0.5)
+	# positive, finite values only for log scale
+	ypos = filter(v -> isfinite(v) && v > 0, y)
+	if isempty(ypos)
+		return ([1.0], (1e-16, 1.0))
+	end
+
+	ymin = minimum(ypos)
+	ymax = maximum(ypos)
+
+	# ticks anchored to data decades (no full-decade padding here)
+	kmin = floor(Int, log10(ymin))
+	kmax = ceil(Int, log10(ymax))
+	ticks = [10.0^k for k in kmax:-step:kmin]
+
+	# fractional-decade breathing room
+	ylo = 10.0^(log10(ymin) - pad_decades)
+	yhi = 10.0^(log10(ymax) + pad_decades)
+
+	# guards
+	if ylo <= 0 || !isfinite(ylo)
+		ylo = ymin / 10.0^pad_decades
+	end
+	if !(yhi > ylo) || !isfinite(yhi)
+		yhi = ymax * 10.0^pad_decades
+	end
+
+	return (ticks, (ylo, yhi))
+end
+
+function tile_profile(coeffs::Vector, z::Vector, L::Real, n_periods::Int)
+	"""
+	Tile a wave profile n_periods times in the spatial domain.
+	
+	Takes Fourier coefficients and repeats the resulting profile without
+	duplicating junction points between periods.
+	
+	Returns:
+	- z_tiled: extended spatial domain
+	- S_tiled: repeated profile values
+	"""
+	
+	# compute profile from coefficients
+	profile = fourierSeries(coeffs, z, L)[1]
+	
+	# compute period length
+	period = z[end] - z[1]
+	
+	# initialize output arrays
+	z_tiled = Vector{eltype(z)}()
+	S_tiled = Vector{eltype(profile)}()
+	
+	# build tiled arrays
+	for i = 0:(n_periods-1)
+		if i == 0
+			# first period: include all points
+			append!(z_tiled, z)
+			append!(S_tiled, profile)
+		else
+			# subsequent periods: skip first point to avoid duplication at junctions
+			append!(z_tiled, z[2:end] .+ i * period)
+			append!(S_tiled, profile[2:end])
+		end
+	end
+	
+	return z_tiled, S_tiled
+end
+
+function tile_profile(profile::Vector, z::Vector, n_periods::Int)
+	"""
+	Tile an already-computed wave profile n_periods times in the spatial domain.
+	
+	Takes a profile array and repeats it without duplicating junction points 
+	between periods.
+	
+	Returns:
+	- z_tiled: extended spatial domain
+	- S_tiled: repeated profile values
+	"""
+	
+	# compute period length
+	period = z[end] - z[1]
+	
+	# initialize output arrays
+	z_tiled = Vector{eltype(z)}()
+	S_tiled = Vector{eltype(profile)}()
+	
+	# build tiled arrays
+	for i = 0:(n_periods-1)
+		if i == 0
+			# first period: include all points
+			append!(z_tiled, z)
+			append!(S_tiled, profile)
+		else
+			# subsequent periods: skip first point to avoid duplication at junctions
+			append!(z_tiled, z[2:end] .+ i * period)
+			append!(S_tiled, profile[2:end])
+		end
+	end
+	
+	return z_tiled, S_tiled
+end
+
 
 ## LEGACY 
 
