@@ -2,7 +2,7 @@
 
 using LinearAlgebra
 
-function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true, progress_interval::Int64 = 10)::Tuple{Matrix{Float64}, Constants, Dict{String, Any}}
+function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, constants::Constants; tol = 1e-12, solver = :myNewtonRaphson, max_iter = 1000, overwrite = false, save_dir::String = "", verbose = true, progress_interval::Int64 = 10, pad_factor::Real = 1.0)::Tuple{Matrix{Float64}, Constants, Dict{String, Any}}
 
 	"Compute the bifurcation branch for branchN branch points and provided a₁ values, starting at the given initial guess, using a continuation scheme."
 
@@ -45,7 +45,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 		if solver == :NLSolver
 
 			# define the set of equations/function to solve: f(x) = 0
-			f(u, p) = equations(u, constants, a1Vals[i], 1.0)
+            f(u, p) = equations(u, constants, a1Vals[i], 1.0; pad_factor = pad_factor)
 
 			# define the problem
 			problem = NonlinearProblem(f, initial_guess[i,:])
@@ -58,7 +58,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 			# flags[i] = sol.stats.status
 
 			# compute Jacobian condition number at converged solution
-			funcJ(u) = equations(u, constants, a1Vals[i], 1.0)
+            funcJ(u) = equations(u, constants, a1Vals[i], 1.0; pad_factor = pad_factor)
 			J = finite_diff_jacobian(funcJ, sol.u)
 			condition_numbers[i] = cond(J)
 			errors[i] = norm(sol.resid)
@@ -66,7 +66,7 @@ function bifurcation(initial_guess::Matrix{Float64}, a1Vals, branchN::Int64, con
 		else
 
 			# define the set of equations/function to solve: f(x) = 0
-			func(u) = equations(u, constants, a1Vals[i], 1.0)
+            func(u) = equations(u, constants, a1Vals[i], 1.0; pad_factor = pad_factor)
 
 			# solve for the current branch point + capture
 			solutions[i,:], iterations[i], flags[i] = mySolver(func, initial_guess[i,:], tol = tol, solver = solver, max_iter = max_iter)

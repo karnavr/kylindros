@@ -1,6 +1,6 @@
 "General equations for the cylindrical AFM formulation with an arbitrary wall model."
 
-function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float64, a₀::Float64)::Vector{Float64}
+function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float64, a₀::Float64; pad_factor::Real = 1.0)::Vector{Float64}
 
 	# Returns the N + 2 equations that we want to solve for:
 	# - N integrals 
@@ -12,11 +12,18 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	a0 = coeffs[1]
 	a1 = coeffs[2]
 
-	S, Sz, Szz, Szzz, Szzzz = fourierSeries(coeffs, constants.z, constants.L)
+    if pad_factor == 1.0
+        z_eval = constants.z
+    else
+        dz_pad = constants.dz / pad_factor
+        z_eval = collect(-Float64(constants.L):dz_pad:Float64(constants.L))
+    end
 
-	integrands = zeros(Float64, constants.N, length(constants.z))
-	integrals = zeros(Float64, constants.N)
-	eqs = zeros(Float64, constants.N+2)            
+    S, Sz, Szz, Szzz, Szzzz = fourierSeries(coeffs, z_eval, constants.L)
+
+    integrands = zeros(Float64, constants.N, length(z_eval))
+    integrals = zeros(Float64, constants.N)
+    eqs = zeros(Float64, constants.N+2)            
 
 	# define common factor in equations 
 	Szsq = 1 .+ (Sz.^2);
@@ -56,9 +63,9 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 	kvals = kvals = [(n*π/constants.L) for n in 1:constants.N]  # length N
 
 	# Precompute cos(k*z) for all n (saves per-iteration cos calls)
-	cos_kz_cache = Array{Float64}(undef, constants.N, length(constants.z))
-	for n in 1:constants.N
-		cos_kz_cache[n, :] .= cos.(kvals[n] .* constants.z)
+    cos_kz_cache = Array{Float64}(undef, constants.N, length(z_eval))
+    for n in 1:constants.N
+        cos_kz_cache[n, :] .= cos.(kvals[n] .* z_eval)
 	end
 
 	# Precompute sqrt(Complex.(one_p)) once; reused across modes
@@ -66,10 +73,10 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 
 	# Thread-local buffers for β(k, S, b) to avoid cross-thread writes
 	# Use maxthreadid() to account for all thread pools (default + interactive)
-	beta_bufs = [zeros(Float64, length(S)) for _ in 1:Threads.maxthreadid()]
+    beta_bufs = [zeros(Float64, length(S)) for _ in 1:Threads.maxthreadid()]
 
 	# Thread-local buffers for row .* cos(k*z) product (to avoid a temporary each iteration)
-	prod_buffers = [zeros(Float64, length(constants.z)) for _ in 1:Threads.maxthreadid()]
+    prod_buffers = [zeros(Float64, length(z_eval)) for _ in 1:Threads.maxthreadid()]
 
 	Threads.@threads :static for n = 1:constants.N
 		k = kvals[n]
@@ -89,7 +96,7 @@ function equations(unknowns::Vector{Float64}, constants::Constants, a₁::Float6
 		cos_row = @view(cos_kz_cache[n, :])
 		prod = prod_buffers[Threads.threadid()]
 		prod .= row .* cos_row
-		integrals[n] = trapz(constants.z, prod)
+        integrals[n] = trapz(z_eval, prod)
 	end
 
 	# global scaling (applies uniformly to all modes)
